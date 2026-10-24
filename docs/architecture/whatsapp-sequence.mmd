@@ -1,0 +1,29 @@
+sequenceDiagram
+  autonumber
+  participant H as Haya / Demo CLI
+  participant A as Hawlak API
+  participant O as OpenAI
+  participant M as Meta WhatsApp Cloud API
+  participant P as Patient
+  participant S as Object Storage
+  participant D as Retaj Dashboard
+
+  H->>A: Load approved synthetic discharge plan
+  A->>O: Rewrite in selected dialect using strict schema
+  O-->>A: Spoken script and copied fact fields
+  A->>A: Deterministic clinical fact comparison
+  A-->>H: Script, fact report, and checksum
+  H->>A: Approve exact checksum
+  A->>O: Render the approved script as Arabic audio
+  O-->>A: Audio stream
+  A->>A: Convert to OGG with Opus codec
+  A->>M: Send disclosure, audio, and photo request
+  M->>P: Deliver WhatsApp messages
+  P->>M: Send medicine-box photo
+  M->>A: Signed messages webhook
+  A->>S: Store image once by WhatsApp message ID
+  A->>M: Send fixed acknowledgement
+  A->>A: Create pharmacist_review_requested once
+  D->>A: Poll review events after cursor
+  A-->>D: Versioned event with photo references
+

@@ -1,0 +1,28 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: hawlak
+      POSTGRES_PASSWORD: hawlak
+      POSTGRES_DB: hawlak
+    ports:
+      - "5432:5432"
+    volumes:
+      - hawlak_postgres:/var/lib/postgresql/data
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: hawlak
+      MINIO_ROOT_PASSWORD: replace_me_now
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - hawlak_minio:/data
+
+volumes:
+  hawlak_postgres:
+  hawlak_minio:
+

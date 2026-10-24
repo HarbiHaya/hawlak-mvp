@@ -1,0 +1,50 @@
+flowchart LR
+  subgraph Patient["Patient on WhatsApp"]
+    WA["Voice note, instructions, and medicine photos"]
+  end
+
+  subgraph Haya["Haya — Voice AI and Integration"]
+    API["Hawlak API"]
+    PLAN["Approved plan adapter"]
+    COMPOSE["Dialect composer"]
+    GUARD{"Clinical fact guard"}
+    APPROVE["Exact-script approval"]
+    VOICE["Arabic voice renderer"]
+    MEDIA["Media intake and storage"]
+    OUTBOX["Review-event outbox"]
+  end
+
+  subgraph Providers["External providers"]
+    OPENAI["OpenAI text and voice APIs"]
+    META["Meta WhatsApp Cloud API"]
+    OBJECTS[("S3-compatible storage")]
+  end
+
+  subgraph Shared["Shared versioned boundary"]
+    CONTRACT["@hawlak/contracts"]
+  end
+
+  subgraph Retaj["Retaj — Care-team Dashboard"]
+    DASH["Review queue"]
+    REVIEW["Pharmacist reviews plan and photos"]
+  end
+
+  PLAN --> COMPOSE
+  COMPOSE --> OPENAI
+  OPENAI --> COMPOSE
+  COMPOSE --> GUARD
+  GUARD -->|"pass"| APPROVE
+  GUARD -->|"mismatch"| REJECT["Reject and show fact diff"]
+  APPROVE --> VOICE
+  VOICE --> OPENAI
+  VOICE --> API
+  API --> META
+  META <--> WA
+  META --> API
+  API --> MEDIA
+  MEDIA --> OBJECTS
+  MEDIA --> OUTBOX
+  OUTBOX --> CONTRACT
+  CONTRACT --> DASH
+  DASH --> REVIEW
+

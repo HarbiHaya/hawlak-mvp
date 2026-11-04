@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<title>Hawlak — Prototype screens</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;background:#F6F7F7;color:#111418;font-family:'Neue Montreal',Inter,'IBM Plex Sans Arabic',sans-serif;-webkit-font-smoothing:antialiased}
+a{color:#2B66E4;text-decoration:none}a:hover{color:#1F4FB8;text-decoration:underline}
+</style>
+</helmet>
+
+<div style="padding:{{ pad }};display:flex;flex-wrap:wrap;gap:64px;align-items:flex-start;color:#111418;font-family:'Neue Montreal',Inter,'IBM Plex Sans Arabic',sans-serif">
+
+<sc-if value="{{ labels }}" hint-placeholder-val="{{ false }}">
+  <div style="flex-basis:100%;display:flex;justify-content:space-between;align-items:flex-end;gap:24px">
+    <div>
+      <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.06em;text-transform:uppercase;color:#646A72">Hawlak · Prototype screens for the pitch</div>
+      <div style="margin-top:8px;font-size:52px;line-height:1.05;font-weight:500;letter-spacing:-0.04em;color:#111418">One approved plan, <span style="color:#2B66E4">seen by everyone who cares.</span></div>
+    </div>
+    <div style="font-size:14px;color:#646A72;max-width:340px;line-height:1.5">All patient data is fictional. Screens are sized for screenshots: desktop 1440×900, mobile 390×844.</div>
+  </div>
+</sc-if>
+
+<!-- ============ A · DOCTOR UPLOAD ============ -->
+<sc-if value="{{ showUpload }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ labels }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:#646A72">A · Clinician — select language &amp; upload discharge document</div></sc-if>
+<div style="width:1440px;height:900px;background:#FFFFFF;border-radius:16px;overflow:hidden;display:grid;grid-template-columns:232px 1fr;box-shadow:0 30px 80px -30px rgba(17,20,24,0.35)">
+  <aside style="background:#F6F7F7;border-inline-end:1px solid #E6E8EB;padding:24px 18px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:center;gap:10px"><svg width="28" height="28" viewBox="0 0 48 48"><path d="M40.31 16.39 A18 18 0 1 1 31.61 7.69" fill="none" stroke="#2B66E4" stroke-width="5.2" stroke-linecap="round"></path><circle cx="24" cy="24" r="6.4" fill="#111418"></circle></svg><span style="font-size:20px;font-weight:600;letter-spacing:-0.04em">hawlak</span><span style="font-size:11px;color:#646A72;background:#EEF1F6;border-radius:6px;padding:2px 6px">Clinical</span></div>
+    <nav style="display:flex;flex-direction:column;gap:4px;font-size:14px;color:#3E444B">
+      <div style="padding:9px 12px;border-radius:8px">Overview</div>
+      <div style="padding:9px 12px;border-radius:8px;background:#111418;color:#FFFFFF;font-weight:500;display:flex;justify-content:space-between">New discharge<span>+</span></div>
+      <div style="padding:9px 12px;border-radius:8px">Patients at home</div>
+      <div style="padding:9px 12px;border-radius:8px">Voice packs</div>
+      <div style="padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between">Pharmacist review<span style="background:#FFE7C2;color:#8A5300;border-radius:10px;padding:0 7px;font-size:12px">3</span></div>
+      <div style="padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between">Alerts<span style="background:#FDE3E3;color:#B42318;border-radius:10px;padding:0 7px;font-size:12px">4</span></div>
+    </nav>
+    <div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding-top:16px;border-top:1px solid #E6E8EB">
+      <div style="width:36px;height:36px;border-radius:50%;background:#DCE6FB;color:#1F4FB8;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">RA</div>
+      <div style="font-size:13px;line-height:1.3"><div style="font-weight:500">Nurse Reem A.</div><div style="color:#646A72">Cardiac unit · Ward 3</div></div>
+    </div>
+  </aside>
+  <main style="padding:28px 36px;display:flex;flex-direction:column;gap:22px;min-width:0">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:24px">
+      <div>
+        <div style="font-size:13px;color:#646A72">New discharge · Voice pack</div>
+        <div style="margin-top:6px;display:flex;align-items:center;gap:14px">
+          <div style="width:52px;height:52px;border-radius:50%;background:#EEF1F6;color:#646A72;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:18px">AH</div>
+          <div><div style="font-size:26px;font-weight:600;letter-spacing:-0.03em">Abdullah Al-Harbi <span style="font-family:'IBM Plex Sans Arabic',sans-serif;font-weight:500;color:#646A72;font-size:20px">· أبو محمد</span></div><div style="font-size:14px;color:#646A72;margin-top:2px">67 years · Post-PCI · Bed 12 · Discharging today 4:00 PM</div></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;font-size:13px">
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:20px;background:#E3F5EC;color:#0E6B41;font-weight:500"><span style="width:20px;height:20px;border-radius:50%;background:#18A058;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:11px">✓</span>Language</div>
+        <div style="width:24px;height:1.5px;background:#D5D9DE"></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:20px;background:#111418;color:#FFFFFF;font-weight:500"><span style="width:20px;height:20px;border-radius:50%;background:#FFFFFF;color:#111418;display:flex;align-items:center;justify-content:center;font-size:11px">2</span>Upload</div>
+        <div style="width:24px;height:1.5px;background:#D5D9DE"></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:20px;background:#F3F4F6;color:#646A72"><span style="width:20px;height:20px;border-radius:50%;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:11px">3</span>Review</div>
+        <div style="width:24px;height:1.5px;background:#D5D9DE"></div>
+        <div style="display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:20px;background:#F3F4F6;color:#646A72"><span style="width:20px;height:20px;border-radius:50%;background:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:11px">4</span>Approve</div>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 340px;gap:24px;flex:1;min-height:0">
+      <div style="display:flex;flex-direction:column;gap:20px;min-width:0">
+        <section style="border:1px solid #E6E8EB;border-radius:14px;padding:20px 22px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:16px;font-weight:600">1 · Patient's language &amp; voice</div><div style="font-size:13px;color:#646A72">Asked at the bedside · 11 Oct, 10:20 AM</div></div>
+          <div style="margin-top:14px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px">
+            <div style="border:2px solid #2B66E4;background:#F2F6FE;border-radius:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center"><div><div style="font-family:'IBM Plex Sans Arabic',sans-serif;font-size:17px;font-weight:600">العربية · نجدي</div><div style="font-size:12px;color:#3E444B;margin-top:2px">Arabic · Najdi voice style</div></div><span style="width:22px;height:22px;border-radius:50%;background:#2B66E4;color:#FFFFFF;font-size:12px;display:flex;align-items:center;justify-content:center">✓</span></div>
+            <div style="border:1px solid #E6E8EB;border-radius:12px;padding:12px 14px"><div style="font-family:'IBM Plex Sans Arabic',sans-serif;font-size:17px;font-weight:500">العربية · فصحى مبسطة</div><div style="font-size:12px;color:#646A72;margin-top:2px">Simple Modern Standard</div></div>
+            <div style="border:1px solid #E6E8EB;border-radius:12px;padding:12px 14px"><div style="font-size:17px;font-weight:500">English</div><div style="font-size:12px;color:#646A72;margin-top:2px">Plain-language voice</div></div>
+            <div style="border:1px solid #E6E8EB;border-radius:12px;padding:12px 14px"><div style="font-family:'IBM Plex Sans Arabic',sans-serif;font-size:17px;font-weight:500">اردو</div><div style="font-size:12px;color:#646A72;margin-top:2px">Urdu · pilot language</div></div>
+            <div style="border:1px dashed #D5D9DE;border-radius:12px;padding:12px 14px;color:#8A9098"><div style="font-size:17px;font-weight:500">Filipino</div><div style="font-size:12px;margin-top:2px">After validation</div></div>
+            <div style="border:1px dashed #D5D9DE;border-radius:12px;padding:12px 14px;color:#8A9098"><div style="font-size:17px;font-weight:500">বাংলা</div><div style="font-size:12px;margin-top:2px">After validation</div></div>
+          </div>
+        </section>
+
+        <section style="border:1px solid #E6E8EB;border-radius:14px;padding:20px 22px;flex:1;display:flex;flex-direction:column;gap:14px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><div style="font-size:16px;font-weight:600">2 · Upload the discharge document</div><div style="font-size:13px;color:#646A72">PDF, photo or EHR export</div></div>
+          <div style="border:1.5px dashed #B9C9EE;background:#F7F9FE;border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:16px">
+            <div style="width:46px;height:56px;border-radius:6px;background:#FFFFFF;border:1px solid #D5D9DE;display:flex;align-items:flex-end;justify-content:center;padding-bottom:6px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:500;color:#B42318">PDF</div>
+            <div style="flex:1;min-width:0">
+              <div style="font-size:15px;font-weight:500">Discharge_Summary_AlHarbi_11Oct.pdf</div>
+              <div style="font-size:13px;color:#646A72;margin-top:2px">2 pages · uploaded by Dr. Faisal K. · 2:14 PM</div>
+              <div style="margin-top:10px;height:6px;border-radius:3px;background:#E3EAFB;overflow:hidden"><div style="width:100%;height:100%;background:#2B66E4"></div></div>
+            </div>
+            <div style="font-size:13px;color:#0E6B41;font-weight:500">Draft ready</div>
+          </div>
+          <div style="font-size:13px;color:#646A72">Hawlak prepared a draft. Nothing is sent until a clinician reviews it.</div>
+          <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px">
+            <div style="background:#F6F7F7;border-radius:12px;padding:14px"><div style="font-size:30px;font-weight:600;letter-spacing:-0.04em">4</div><div style="font-size:13px;color:#3E444B">medicines to take</div></div>
+            <div style="background:#FDECEC;border-radius:12px;padding:14px"><div style="font-size:30px;font-weight:600;letter-spacing:-0.04em;color:#B42318">1</div><div style="font-size:13px;color:#3E444B">medicine stopped</div></div>
+            <div style="background:#F6F7F7;border-radius:12px;padding:14px"><div style="font-size:30px;font-weight:600;letter-spacing:-0.04em">2</div><div style="font-size:13px;color:#3E444B">appointments</div></div>
+            <div style="background:#F6F7F7;border-radius:12px;padding:14px"><div style="font-size:30px;font-weight:600;letter-spacing:-0.04em">5</div><div style="font-size:13px;color:#3E444B">danger signs</div></div>
+          </div>
+          <div style="margin-top:auto;display:flex;justify-content:flex-end;gap:10px">
+            <div style="padding:12px 18px;border-radius:10px;border:1px solid #D5D9DE;font-size:14px;font-weight:500">Replace file</div>
+            <div style="padding:12px 20px;border-radius:10px;background:#2B66E4;color:#FFFFFF;font-size:14px;font-weight:500">Review draft voice pack →</div>
+          </div>
+        </section>
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:16px">
+        <section style="border:1px solid #E6E8EB;border-radius:14px;padding:18px 20px">
+          <div style="font-size:13px;color:#646A72">Authorized caregiver</div>
+          <div style="margin-top:10px;display:flex;align-items:center;gap:12px">
+            <div style="width:42px;height:42px;border-radius:50%;background:#E3F5EC;color:#0E6B41;display:flex;align-items:center;justify-content:center;font-weight:600">MH</div>
+            <div style="font-size:14px;line-height:1.35"><div style="font-weight:600">Mohammed Al-Harbi</div><div style="color:#646A72">Son · +966 5• ••• 4471</div></div>
+          </div>
+          <div style="margin-top:12px;font-size:13px;color:#0E6B41;background:#E3F5EC;border-radius:8px;padding:8px 10px">✓ Patient consent recorded · voice, 10:24 AM</div>
+        </section>
+        <section style="border:1px solid #E6E8EB;border-radius:14px;padding:18px 20px">
+          <div style="font-size:13px;color:#646A72">Home support</div>
+          <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px;font-size:14px">
+            <div style="display:flex;justify-content:space-between"><span>Programme</span><span style="font-weight:500">30 days</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Medicine check</span><span style="font-weight:500">On arrival home</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Reminder channel</span><span style="font-weight:500">WhatsApp voice</span></div>
+            <div style="display:flex;justify-content:space-between"><span>Escalation rule</span><span style="font-weight:500">Cardiac v2.1</span></div>
+          </div>
+        </section>
+        <section style="border-radius:14px;padding:18px 20px;background:#111418;color:#FFFFFF;margin-top:auto">
+          <div style="font-size:20px;line-height:1.3;font-weight:500;letter-spacing:-0.02em">"The patient receives nothing until a clinician approves the pack."</div>
+          <div style="margin-top:10px;font-size:12px;color:#B8BEC6">Hawlak safety rule 01</div>
+        </section>
+      </div>
+    </div>
+  </main>
+</div>
+</div>
+</sc-if>
+
+<!-- ============ B · REVIEW VOICE PACK ============ -->
+<sc-if value="{{ showReview }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ labels }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:#646A72">B · Clinician — review &amp; approve the voice pack</div></sc-if>
+<div style="width:1440px;height:900px;background:#FFFFFF;border-radius:16px;overflow:hidden;display:grid;grid-template-columns:232px 1fr;box-shadow:0 30px 80px -30px rgba(17,20,24,0.35)">
+  <aside style="background:#F6F7F7;border-inline-end:1px solid #E6E8EB;padding:24px 18px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:center;gap:10px"><svg width="28" height="28" viewBox="0 0 48 48"><path d="M40.31 16.39 A18 18 0 1 1 31.61 7.69" fill="none" stroke="#2B66E4" stroke-width="5.2" stroke-linecap="round"></path><circle cx="24" cy="24" r="6.4" fill="#111418"></circle></svg><span style="font-size:20px;font-weight:600;letter-spacing:-0.04em">hawlak</span><span style="font-size:11px;color:#646A72;background:#EEF1F6;border-radius:6px;padding:2px 6px">Clinical</span></div>
+    <nav style="display:flex;flex-direction:column;gap:4px;font-size:14px;color:#3E444B">
+      <div style="padding:9px 12px;border-radius:8px">Overview</div>
+      <div style="padding:9px 12px;border-radius:8px;background:#111418;color:#FFFFFF;font-weight:500;display:flex;justify-content:space-between">New discharge<span>+</span></div>
+      <div style="padding:9px 12px;border-radius:8px">Patients at home</div>
+      <div style="padding:9px 12px;border-radius:8px">Voice packs</div>
+      <div style="padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between">Pharmacist review<span style="background:#FFE7C2;color:#8A5300;border-radius:10px;padding:0 7px;font-size:12px">3</span></div>
+      <div style="padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between">Alerts<span style="background:#FDE3E3;color:#B42318;border-radius:10px;padding:0 7px;font-size:12px">4</span></div>
+    </nav>
+    <div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding-top:16px;border-top:1px solid #E6E8EB">
+      <div style="width:36px;height:36px;border-radius:50%;background:#DCE6FB;color:#1F4FB8;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">FK</div>
+      <div style="font-size:13px;line-height:1.3"><div style="font-weight:500">Dr. Faisal K.</div><div style="color:#646A72">Cardiology</div></div>
+    </div>
+  </aside>
+  <main style="padding:28px 36px;display:flex;flex-direction:column;gap:20px;min-width:0">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:24px">
+      <div>
+        <div style="font-size:13px;color:#646A72">Step 3 of 4 · Review voice pack</div>
+        <div style="margin-top:4px;font-size:26px;font-weight:600;letter-spacing:-0.03em">Abdullah Al-Harbi <span style="font-family:'IBM Plex Sans Arabic',sans-serif;font-weight:500;color:#646A72;font-size:20px">· أبو محمد</span></div>
+      </div>
+      <div style="display:flex;gap:8px;font-size:13px">
+        <span style="padding:7px 12px;border-radius:20px;background:#F2F6FE;color:#1F4FB8;font-weight:500">العربية · نجدي</span>
+        <span style="padding:7px 12px;border-radius:20px;background:#FFF3DC;color:#8A5300;font-weight:500">Draft · not sent</span>
+      </div>
+    </div>
+
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 440px;gap:24px;flex:1;min-height:0">
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
+        <section style="border:1px solid #E6E8EB;border-radius:14px;overflow:hidden">
+          <div style="display:grid;grid-template-columns:minmax(0,1.5fr) 110px 150px 110px 90px;gap:12px;padding:12px 18px;background:#F6F7F7;font-size:12px;color:#646A72;font-weight:500;text-transform:uppercase;letter-spacing:0.04em"><span>Medicine</span><span>Dose</span><span>When</span><span>Change</span><span>Checked</span></div>
+          <sc-for list="{{ meds }}" as="m" hint-placeholder-count="5">
+            <div style="display:grid;grid-template-columns:minmax(0,1.5fr) 110px 150px 110px 90px;gap:12px;padding:14px 18px;border-top:1px solid #EEF0F2;align-items:center;font-size:14px">
+              <div style="display:flex;align-items:center;gap:12px;min-width:0"><span style="width:36px;height:28px;border-radius:5px;background:{{ m.box }};flex:none"></span><div style="min-width:0"><div style="font-weight:500">{{ m.name }}</div><div style="font-size:12px;color:#646A72">{{ m.purpose }}</div></div></div>
+              <span>{{ m.dose }}</span>
+              <span>{{ m.when }}</span>
+              <span style="justify-self:start;padding:3px 10px;border-radius:12px;font-size:12px;font-weight:500;background:{{ m.chipBg }};color:{{ m.chipFg }}">{{ m.change }}</span>
+              <span style="width:22px;height:22px;border-radius:6px;background:#18A058;color:#FFFFFF;font-size:12px;display:flex;align-items:center;justify-content:center">✓</span>
+            </div>
+          </sc-for>
+        </section>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px">
+          <section style="border:1px solid #E6E8EB;border-radius:14px;padding:16px 18px">
+            <div style="font-size:14px;font-weight:600">Appointments</div>
+            <div style="margin-top:10px;display:flex;flex-direction:column;gap:8px;font-size:14px;color:#3E444B">
+              <div style="display:flex;justify-content:space-between"><span>Wound check · Clinic 4</span><span style="color:#111418;font-weight:500">Thu 16 Oct</span></div>
+              <div style="display:flex;justify-content:space-between"><span>Cardiology follow-up</span><span style="color:#111418;font-weight:500">Sun 26 Oct</span></div>
+            </div>
+          </section>
+          <section style="border:1px solid #F4C7C3;background:#FFF8F7;border-radius:14px;padding:16px 18px">
+            <div style="font-size:14px;font-weight:600;color:#B42318">Danger signs · call 997</div>
+            <div style="margin-top:10px;font-size:14px;line-height:1.5;color:#3E444B">Chest pain · Shortness of breath · Bleeding at the wound site · Fainting · Swelling of the legs</div>
+          </section>
+        </div>
+      </div>
+
+      <section style="background:#F6F7F7;border-radius:16px;padding:20px 22px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;justify-content:space-between;align-items:center"><div style="font-size:16px;font-weight:600">First voice note</div><div style="font-size:12px;color:#646A72">Sent when the patient leaves</div></div>
+        <div style="background:#FFFFFF;border-radius:14px;padding:14px 16px;display:flex;align-items:center;gap:14px;box-shadow:0 1px 2px rgba(0,0,0,0.06)">
+          <div style="width:44px;height:44px;border-radius:50%;background:#2B66E4;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:16px;flex:none">▶</div>
+          <div style="flex:1;display:flex;align-items:center;gap:3px;height:36px">
+            <sc-for list="{{ bars }}" as="b" hint-placeholder-count="36"><span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.c }}"></span></sc-for>
+          </div>
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:13px;color:#646A72">0:38</div>
+        </div>
+        <div dir="rtl" lang="ar" style="font-family:'IBM Plex Sans Arabic',sans-serif;font-size:17px;line-height:1.85;color:#111418;background:#FFFFFF;border-radius:14px;padding:16px 18px">الحمد لله على سلامتك يا أبو محمد. أنت اليوم طلعت من المستشفى بعد علاج مشكلة في القلب. عندك <span style="background:#E3EAFB;border-radius:4px;padding:0 3px">ثلاثة أدوية جديدة</span>، وفي <span style="background:#FDE3E3;border-radius:4px;padding:0 3px">دواء قديم وقفه الطبيب</span>. لا تشيل هم، حنا بنذكّرك بمواعيد أدويتك.</div>
+        <div style="display:flex;flex-direction:column;gap:8px;font-size:13px">
+          <div style="display:flex;justify-content:space-between;align-items:center"><span>Medical translator</span><span style="color:#0E6B41;font-weight:500">✓ Huda S.</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><span>Pharmacist</span><span style="color:#0E6B41;font-weight:500">✓ Omar B.</span></div>
+          <div style="display:flex;justify-content:space-between;align-items:center"><span>Physician sign-off</span><span style="color:#8A5300;font-weight:500">Waiting for you</span></div>
+        </div>
+        <div style="margin-top:auto;padding:15px 18px;border-radius:12px;background:#18A058;color:#FFFFFF;font-size:15px;font-weight:600;text-align:center">Approve &amp; send to Abu Mohammed</div>
+        <div style="font-size:12px;color:#646A72;text-align:center">Approval locks the wording. The AI cannot add new advice.</div>
+      </section>
+    </div>
+  </main>
+</div>
+</div>
+</sc-if>
+
+<!-- ============ C · CLINICAL DASHBOARD ============ -->
+<sc-if value="{{ showClinical }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ labels }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:#646A72">C · Clinical team — patients at home</div></sc-if>
+<div style="width:1440px;height:900px;background:#FFFFFF;border-radius:16px;overflow:hidden;display:grid;grid-template-columns:232px 1fr;box-shadow:0 30px 80px -30px rgba(17,20,24,0.35)">
+  <aside style="background:#F6F7F7;border-inline-end:1px solid #E6E8EB;padding:24px 18px;display:flex;flex-direction:column;gap:28px">
+    <div style="display:flex;align-items:center;gap:10px"><svg width="28" height="28" viewBox="0 0 48 48"><path d="M40.31 16.39 A18 18 0 1 1 31.61 7.69" fill="none" stroke="#2B66E4" stroke-width="5.2" stroke-linecap="round"></path><circle cx="24" cy="24" r="6.4" fill="#111418"></circle></svg><span style="font-size:20px;font-weight:600;letter-spacing:-0.04em">hawlak</span><span style="font-size:11px;color:#646A72;background:#EEF1F6;border-radius:6px;padding:2px 6px">Clinical</span></div>
+    <nav style="display:flex;flex-direction:column;gap:4px;font-size:14px;color:#3E444B">
+      <div style="padding:9px 12px;border-radius:8px">Overview</div>
+      <div style="padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between">New discharge<span>+</span></div>
+      <div style="padding:9px 12px;border-radius:8px;background:#111418;color:#FFFFFF;font-weight:500">Patients at home</div>
+      <div style="padding:9px 12px;border-radius:8px">Voice packs</div>
+      <div style="padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between">Pharmacist review<span style="background:#FFE7C2;color:#8A5300;border-radius:10px;padding:0 7px;font-size:12px">3</span></div>
+      <div style="padding:9px 12px;border-radius:8px;display:flex;justify-content:space-between">Alerts<span style="background:#FDE3E3;color:#B42318;border-radius:10px;padding:0 7px;font-size:12px">4</span></div>
+    </nav>
+    <div style="margin-top:auto;display:flex;align-items:center;gap:10px;padding-top:16px;border-top:1px solid #E6E8EB">
+      <div style="width:36px;height:36px;border-radius:50%;background:#DCE6FB;color:#1F4FB8;display:flex;align-items:center;justify-content:center;font-weight:600;font-size:13px">RA</div>
+      <div style="font-size:13px;line-height:1.3"><div style="font-weight:500">Nurse Reem A.</div><div style="color:#646A72">Cardiac unit · Ward 3</div></div>
+    </div>
+  </aside>
+  <main style="padding:28px 32px;display:flex;flex-direction:column;gap:20px;min-width:0">
+    <div style="display:flex;justify-content:space-between;align-items:flex-end">
+      <div><div style="font-size:13px;color:#646A72">Wednesday 15 October · 9:30 PM</div><div style="margin-top:4px;font-size:28px;font-weight:600;letter-spacing:-0.03em">Good evening, Reem. <span style="color:#646A72;font-weight:500">4 patients may need support.</span></div></div>
+      <div style="display:flex;gap:8px;font-size:13px"><span style="padding:8px 12px;border-radius:8px;border:1px solid #E6E8EB">Cardiac unit</span><span style="padding:8px 12px;border-radius:8px;border:1px solid #E6E8EB">Last 24 h</span></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px">
+      <div style="border:1px solid #E6E8EB;border-radius:12px;padding:14px 16px"><div style="font-size:13px;color:#646A72">At home now</div><div style="margin-top:6px;font-size:32px;font-weight:600;letter-spacing:-0.04em">42</div></div>
+      <div style="border:1px solid #E6E8EB;border-radius:12px;padding:14px 16px"><div style="font-size:13px;color:#646A72">Voice notes heard</div><div style="margin-top:6px;font-size:32px;font-weight:600;letter-spacing:-0.04em">96%</div></div>
+      <div style="border:1px solid #E6E8EB;border-radius:12px;padding:14px 16px"><div style="font-size:13px;color:#646A72">Medicine checks done</div><div style="margin-top:6px;font-size:32px;font-weight:600;letter-spacing:-0.04em">38<span style="font-size:18px;color:#8A9098">/42</span></div></div>
+      <div style="border-radius:12px;padding:14px 16px;background:#FFF3DC"><div style="font-size:13px;color:#8A5300">Mismatches · pharmacist</div><div style="margin-top:6px;font-size:32px;font-weight:600;letter-spacing:-0.04em;color:#8A5300">3</div></div>
+      <div style="border-radius:12px;padding:14px 16px;background:#FDECEC"><div style="font-size:13px;color:#B42318">May need support</div><div style="margin-top:6px;font-size:32px;font-weight:600;letter-spacing:-0.04em;color:#B42318">4</div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:20px;flex:1;min-height:0">
+      <section style="border:1px solid #E6E8EB;border-radius:14px;overflow:hidden">
+        <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 60px 130px 96px minmax(0,1.2fr) 118px;gap:12px;padding:12px 16px;background:#F6F7F7;font-size:12px;color:#646A72;font-weight:500;text-transform:uppercase;letter-spacing:0.04em"><span>Patient</span><span>Day</span><span>Medicine check</span><span>Today</span><span>Family follow-up</span><span>Status</span></div>
+        <sc-for list="{{ patients }}" as="p" hint-placeholder-count="7">
+          <div style="display:grid;grid-template-columns:minmax(0,1.6fr) 60px 130px 96px minmax(0,1.2fr) 118px;gap:12px;padding:13px 16px;border-top:1px solid #EEF0F2;align-items:center;font-size:14px;background:{{ p.rowBg }}">
+            <div style="display:flex;align-items:center;gap:10px;min-width:0"><span style="width:34px;height:34px;border-radius:50%;background:#EEF1F6;color:#646A72;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center;flex:none">{{ p.ini }}</span><div style="min-width:0"><div style="font-weight:500">{{ p.name }}</div><div style="font-size:12px;color:#646A72">{{ p.sub }}</div></div></div>
+            <span style="font-family:'IBM Plex Mono',monospace;font-size:13px">{{ p.day }}</span>
+            <span style="font-size:13px;color:{{ p.checkFg }}">{{ p.check }}</span>
+            <div style="display:flex;gap:5px"><sc-for list="{{ p.doses }}" as="d" hint-placeholder-count="3"><span style="width:16px;height:16px;border-radius:50%;background:{{ d }}"></span></sc-for></div>
+            <span style="font-size:13px;color:#3E444B">{{ p.cg }}</span>
+            <span style="justify-self:start;padding:4px 10px;border-radius:12px;font-size:12px;font-weight:500;background:{{ p.chipBg }};color:{{ p.chipFg }}">{{ p.status }}</span>
+          </div>
+        </sc-for>
+        <div style="display:flex;gap:18px;padding:12px 16px;border-top:1px solid #EEF0F2;font-size:12px;color:#646A72">
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#18A058"></span>Taken (self-reported)</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#E5484D"></span>Not taken</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#F2A93B"></span>No response</span>
+          <span style="display:flex;align-items:center;gap:6px"><span style="width:10px;height:10px;border-radius:50%;background:#D5D9DE"></span>Upcoming</span>
+        </div>
+      </section>
+      <section style="display:flex;flex-direction:column;gap:12px">
+        <div style="font-size:15px;font-weight:600">Needs attention</div>
+        <div style="border-radius:12px;padding:14px 16px;background:#FDECEC">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#B42318;font-weight:500"><span>NOT TAKEN</span><span>9:04 PM</span></div>
+          <div style="margin-top:6px;font-size:14px;font-weight:500">Abu Mohammed missed Atorvastatin</div>
+          <div style="margin-top:4px;font-size:13px;color:#3E444B">Son called him at 9:12 PM. Waiting for confirmation.</div>
+        </div>
+        <div style="border-radius:12px;padding:14px 16px;background:#FFF3DC">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#8A5300;font-weight:500"><span>MISMATCH</span><span>6:40 PM</span></div>
+          <div style="margin-top:6px;font-size:14px;font-weight:500">Atorvastatin 20 mg found at home</div>
+          <div style="margin-top:4px;font-size:13px;color:#3E444B">Plan says 40 mg. Sent to pharmacist Omar B.</div>
+        </div>
+        <div style="border-radius:12px;padding:14px 16px;background:#FFF3DC">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#8A5300;font-weight:500"><span>NO RESPONSE</span><span>8:00 PM</span></div>
+          <div style="margin-top:6px;font-size:14px;font-weight:500">Fatimah Al-Qahtani · 2 reminders</div>
+          <div style="margin-top:4px;font-size:13px;color:#3E444B">Daughter notified automatically.</div>
+        </div>
+        <div style="border:1px solid #E6E8EB;border-radius:12px;padding:14px 16px">
+          <div style="display:flex;justify-content:space-between;font-size:12px;color:#646A72;font-weight:500"><span>HELP REQUESTED</span><span>5:15 PM</span></div>
+          <div style="margin-top:6px;font-size:14px;font-weight:500">Nour Haddad · "feeling dizzy"</div>
+          <div style="margin-top:4px;font-size:13px;color:#3E444B">Nurse called · resolved 5:40 PM</div>
+        </div>
+      </section>
+    </div>
+  </main>
+</div>
+</div>
+</sc-if>
+
+<!-- ============ D · FAMILY MOBILE ============ -->
+<sc-if value="{{ showFamily }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ labels }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:#646A72">D · Family — Mohammed follows his father</div></sc-if>
+<div style="width:390px;height:844px;background:#F6F7F7;border-radius:44px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 0 10px #111418,0 30px 80px -20px rgba(17,20,24,0.45)">
+  <div style="display:flex;justify-content:space-between;padding:16px 28px 0;font-size:15px;font-weight:600"><span>9:14</span><span style="font-size:12px">●●● ▮</span></div>
+  <div style="padding:18px 22px 0;display:flex;justify-content:space-between;align-items:center">
+    <div style="display:flex;align-items:center;gap:8px"><svg width="22" height="22" viewBox="0 0 48 48"><path d="M40.31 16.39 A18 18 0 1 1 31.61 7.69" fill="none" stroke="#2B66E4" stroke-width="5.2" stroke-linecap="round"></path><circle cx="24" cy="24" r="6.4" fill="#111418"></circle></svg><span style="font-size:15px;font-weight:600;letter-spacing:-0.04em">hawlak</span><span style="font-size:11px;color:#0E6B41;background:#E3F5EC;border-radius:6px;padding:2px 6px">Family</span></div>
+    <span style="width:34px;height:34px;border-radius:50%;background:#E3F5EC;color:#0E6B41;font-size:12px;font-weight:600;display:flex;align-items:center;justify-content:center">MH</span>
+  </div>
+  <div style="padding:16px 22px 0;display:flex;align-items:center;gap:14px">
+    <div style="width:64px;height:64px;border-radius:50%;overflow:hidden;flex:none;background:#EEF1F6;color:#646A72;display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:600">AH</div>
+    <div><div style="font-size:26px;line-height:1.05;font-weight:600;letter-spacing:-0.03em">Dad <span style="font-family:'IBM Plex Sans Arabic',sans-serif;font-size:18px;color:#646A72">· أبوي</span></div><div style="font-size:13px;color:#646A72;margin-top:4px">Day 4 of 30 at home · heart recovery</div></div>
+  </div>
+  <div style="margin:14px 22px 0;height:6px;border-radius:3px;background:#E6E8EB;overflow:hidden"><div style="width:13%;height:100%;background:#2B66E4"></div></div>
+
+  <div style="margin:16px 16px 0;border-radius:18px;background:#FFFFFF;padding:14px 16px;border:1.5px solid #F4B4B4;box-shadow:0 8px 20px -12px rgba(180,35,24,0.4)">
+    <div style="display:flex;justify-content:space-between;font-size:12px;color:#B42318;font-weight:600"><span>❌ NOT TAKEN · 9:04 PM</span><span>Atorvastatin</span></div>
+    <div style="margin-top:6px;font-size:15px;line-height:1.35;font-weight:500">Dad pressed "not taken" for his evening heart medicine.</div>
+    <div style="margin-top:12px;display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="padding:12px 0;border-radius:12px;background:#111418;color:#FFFFFF;font-size:14px;font-weight:600;text-align:center">📞 Call Dad</div>
+      <div style="padding:12px 0;border-radius:12px;background:#E3F5EC;color:#0E6B41;font-size:14px;font-weight:600;text-align:center">I saw him take it</div>
+    </div>
+  </div>
+
+  <div style="margin:16px 22px 0;font-size:13px;color:#646A72;font-weight:500">Today</div>
+  <div style="margin:8px 16px 0;border-radius:18px;background:#FFFFFF;padding:4px 16px">
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #EEF0F2"><span style="width:40px;height:30px;border-radius:5px;background:linear-gradient(90deg,#FFFFFF 55%,#E5484D 55%);border:1px solid #E6E8EB;flex:none"></span><div style="flex:1;font-size:14px"><div style="font-weight:500">Aspirin 81 mg</div><div style="font-size:12px;color:#646A72">8:00 AM · with breakfast</div></div><span style="white-space:nowrap;font-size:12px;font-weight:600;color:#0E6B41">✅ Taken</span></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #EEF0F2"><span style="width:40px;height:30px;border-radius:5px;background:linear-gradient(90deg,#FFFFFF 55%,#2B66E4 55%);border:1px solid #E6E8EB;flex:none"></span><div style="flex:1;font-size:14px"><div style="font-weight:500">Clopidogrel 75 mg</div><div style="font-size:12px;color:#646A72">8:00 AM · after breakfast</div></div><span style="white-space:nowrap;font-size:12px;font-weight:600;color:#0E6B41">✅ Taken</span></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid #EEF0F2"><span style="width:40px;height:30px;border-radius:5px;background:linear-gradient(90deg,#FFFFFF 55%,#18A058 55%);border:1px solid #E6E8EB;flex:none"></span><div style="flex:1;font-size:14px"><div style="font-weight:500">Bisoprolol 2.5 mg</div><div style="font-size:12px;color:#646A72">8:00 AM · you confirmed</div></div><span style="white-space:nowrap;font-size:12px;font-weight:600;color:#1F4FB8">👁 Seen</span></div>
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 0"><span style="width:40px;height:30px;border-radius:5px;background:linear-gradient(90deg,#FFFFFF 55%,#8A5CF6 55%);border:1px solid #E6E8EB;flex:none"></span><div style="flex:1;font-size:14px"><div style="font-weight:500">Atorvastatin 40 mg</div><div style="font-size:12px;color:#646A72">9:00 PM · at night</div></div><span style="white-space:nowrap;font-size:12px;font-weight:600;color:#B42318">❌ Not taken</span></div>
+  </div>
+
+  <div style="margin:12px 16px 0;border-radius:18px;background:#FFFFFF;padding:12px 14px;display:flex;align-items:center;gap:12px">
+    <span style="width:38px;height:38px;border-radius:50%;background:#2B66E4;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:13px;flex:none">▶</span>
+    <div style="flex:1;font-size:13px"><div style="font-weight:500">Hear what Dad heard</div><div style="color:#646A72">Discharge voice note · 0:38</div></div>
+  </div>
+  <div style="margin:12px 16px 0;border-radius:18px;background:#FFFFFF;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;font-size:13px">
+    <div><div style="font-weight:500">Wound check · Clinic 4</div><div style="color:#646A72">Thursday 16 Oct · 10:30 AM</div></div><span style="color:#1F4FB8;font-weight:500">Add to calendar</span>
+  </div>
+  <div style="margin:auto 22px 22px;font-size:11px;line-height:1.4;color:#646A72;text-align:center">Shared by Dad's consent. You can follow and support — only his doctor can change the medicines.</div>
+</div>
+</div>
+</sc-if>
+
+<!-- ============ E · WHATSAPP REMINDER ============ -->
+<sc-if value="{{ showReminder }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ labels }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:#646A72">E · Patient — a reminder that needs no reading</div></sc-if>
+<div style="width:390px;height:844px;background:#EEF0F3;border-radius:44px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 0 10px #111418,0 30px 80px -20px rgba(17,20,24,0.45)">
+  <div style="background:#F7F7F5;padding:16px 28px 12px;display:flex;justify-content:space-between;font-size:15px;font-weight:600"><span>9:00</span><span style="font-size:12px">●●● ▮</span></div>
+  <div style="background:#F7F7F5;padding:0 16px 12px;display:flex;align-items:center;gap:12px;border-bottom:1px solid #E6E8EB">
+    <span style="font-size:20px;color:#2B66E4">‹</span>
+    <span style="width:38px;height:38px;border-radius:50%;background:#FFFFFF;display:flex;align-items:center;justify-content:center;flex:none"><svg width="24" height="24" viewBox="0 0 48 48"><path d="M40.31 16.39 A18 18 0 1 1 31.61 7.69" fill="none" stroke="#2B66E4" stroke-width="5.2" stroke-linecap="round"></path><circle cx="24" cy="24" r="6.4" fill="#111418"></circle></svg></span>
+    <div style="flex:1"><div style="font-size:15px;font-weight:600">Hawlak · حولك <span style="color:#18A058;font-size:13px">✓</span></div><div style="font-size:12px;color:#646A72">King Fahad Heart Centre</div></div>
+  </div>
+  <div style="flex:1;padding:14px 12px;display:flex;flex-direction:column;gap:8px">
+    <div style="align-self:center;font-size:11px;color:#646A72;background:#E2F0F7;border-radius:8px;padding:4px 10px">Today</div>
+    <div style="align-self:flex-start;max-width:300px;background:#FFFFFF;border-radius:4px 14px 14px 14px;padding:6px;box-shadow:0 1px 1px rgba(0,0,0,0.08)">
+      <div style="height:200px;border-radius:10px;background:radial-gradient(circle at 30% 20%,#F6F7F7,#DDE2EA);display:flex;align-items:center;justify-content:center;position:relative">
+        <div style="width:170px;height:96px;border-radius:8px;background:#FFFFFF;box-shadow:0 12px 24px -10px rgba(17,20,24,0.5);transform:rotate(-6deg);display:grid;grid-template-columns:1fr 46px;overflow:hidden">
+          <div style="padding:12px;display:flex;flex-direction:column;justify-content:space-between"><div style="font-size:15px;font-weight:700;letter-spacing:-0.02em">Atorvastatin</div><div style="font-size:11px;color:#646A72">40 mg · 30 tablets</div></div>
+          <div style="background:#8A5CF6"></div>
+        </div>
+        <div style="position:absolute;bottom:8px;left:8px;font-size:11px;color:#FFFFFF;background:rgba(17,20,24,0.6);border-radius:6px;padding:2px 8px">Your photo · 11 Oct</div>
+      </div>
+      <div style="padding:8px 8px 2px;display:flex;align-items:center;gap:10px">
+        <span style="width:34px;height:34px;border-radius:50%;background:#2B66E4;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:12px;flex:none">▶</span>
+        <div style="flex:1;display:flex;align-items:center;gap:2px;height:26px"><sc-for list="{{ barsSmall }}" as="b" hint-placeholder-count="28"><span style="flex:1;border-radius:2px;height:{{ b.h }};background:{{ b.c }}"></span></sc-for></div>
+        <span style="font-size:11px;color:#646A72">0:12</span>
+      </div>
+      <div dir="rtl" lang="ar" style="padding:6px 8px 4px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:15px;line-height:1.7;color:#111418">يا أبو محمد، الحين وقت دواء القلب. خذ حبة وحدة من العلبة اللي في الصورة.</div>
+      <div style="padding:0 8px 4px;font-size:11px;color:#8A9098;text-align:end">9:00 PM</div>
+    </div>
+    <div style="max-width:300px;display:flex;flex-direction:column;gap:6px">
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:19px;font-weight:600;color:#0E6B41;box-shadow:0 1px 1px rgba(0,0,0,0.08);border:2px solid #18A058">✅ أخذته <span style="font-family:Inter,sans-serif;font-size:13px;font-weight:500;color:#646A72">Taken</span></div>
+      <div style="background:#FFFFFF;border-radius:12px;padding:14px;display:flex;align-items:center;justify-content:center;gap:10px;font-family:'IBM Plex Sans Arabic',sans-serif;font-size:19px;font-weight:600;color:#B42318;box-shadow:0 1px 1px rgba(0,0,0,0.08);border:2px solid #E5484D">❌ ما أخذته <span style="font-family:Inter,sans-serif;font-size:13px;font-weight:500;color:#646A72">Not taken</span></div>
+    </div>
+    <div style="margin-top:auto;align-self:center;font-size:11px;color:#646A72;background:rgba(255,255,255,0.7);border-radius:8px;padding:6px 10px;text-align:center;line-height:1.4">No typing · no menus · no medical terms</div>
+  </div>
+  <div style="background:#F7F7F5;padding:10px 14px 26px;display:flex;align-items:center;gap:10px">
+    <div style="flex:1;height:38px;border-radius:19px;background:#FFFFFF;border:1px solid #E6E8EB"></div>
+    <span style="width:38px;height:38px;border-radius:50%;background:#18A058;color:#FFFFFF;display:flex;align-items:center;justify-content:center;font-size:15px">🎙</span>
+  </div>
+</div>
+</div>
+</sc-if>
+
+<!-- ============ F · MEDICINE CHECK ============ -->
+<sc-if value="{{ showMedcheck }}" hint-placeholder-val="{{ true }}">
+<div style="display:flex;flex-direction:column;gap:14px">
+<sc-if value="{{ labels }}" hint-placeholder-val="{{ false }}"><div style="font-family:'IBM Plex Mono',monospace;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;color:#646A72">F · Home — checking the medicine boxes</div></sc-if>
+<div style="width:390px;height:844px;background:#F6F7F7;border-radius:44px;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 0 0 10px #111418,0 30px 80px -20px rgba(17,20,24,0.45)">
+  <div style="display:flex;justify-content:space-between;padding:16px 28px 0;font-size:15px;font-weight:600"><span>6:42</span><span style="font-size:12px">●●● ▮</span></div>
+  <div style="padding:18px 22px 0">
+    <div style="font-size:13px;color:#646A72">First evening at home</div>
+    <div style="margin-top:4px;font-size:28px;line-height:1.1;font-weight:600;letter-spacing:-0.03em">Let's check the boxes on the table.</div>
+    <div style="margin-top:12px;display:flex;gap:4px"><span style="flex:1;height:5px;border-radius:3px;background:#2B66E4"></span><span style="flex:1;height:5px;border-radius:3px;background:#2B66E4"></span><span style="flex:1;height:5px;border-radius:3px;background:#2B66E4"></span><span style="flex:1;height:5px;border-radius:3px;background:#2B66E4"></span><span style="flex:1;height:5px;border-radius:3px;background:#E6E8EB"></span></div>
+    <div style="margin-top:6px;font-size:12px;color:#646A72">4 of 5 boxes photographed</div>
+  </div>
+  <div style="margin:14px 16px 0;display:flex;flex-direction:column;gap:8px">
+    <sc-for list="{{ checks }}" as="c" hint-placeholder-count="5">
+      <div style="background:#FFFFFF;border-radius:16px;padding:10px 12px;display:flex;align-items:center;gap:12px;border:1.5px solid {{ c.border }}">
+        <div style="width:58px;height:44px;border-radius:6px;background:#FFFFFF;box-shadow:0 4px 10px -4px rgba(17,20,24,0.35);display:grid;grid-template-columns:1fr 14px;overflow:hidden;flex:none;border:1px solid #EEE"><div style="padding:5px;font-size:8px;font-weight:700;line-height:1.1">{{ c.brand }}</div><div style="background:{{ c.box }}"></div></div>
+        <div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:600">{{ c.name }}</div><div style="font-size:12px;line-height:1.35;color:{{ c.fg }}">{{ c.result }}</div></div>
+        <span style="font-size:18px">{{ c.icon }}</span>
+      </div>
+    </sc-for>
+  </div>
+  <div style="margin:12px 16px 0;border-radius:16px;background:#FFF3DC;padding:12px 14px;font-size:13px;line-height:1.4;color:#5C3A00"><strong style="font-weight:600">Pharmacist Omar is checking the 20 mg box.</strong> Keep it aside. You'll get a voice note within the hour.</div>
+  <div style="margin:auto 16px 26px;padding:16px;border-radius:16px;background:#111418;color:#FFFFFF;text-align:center;font-size:15px;font-weight:600">📷 Photograph the last box</div>
+  <div style="margin:-14px 16px 22px;font-size:12px;color:#646A72;text-align:center">Need help? <span style="color:#1F4FB8;font-weight:500">Ask Mohammed to take the photos</span></div>
+</div>
+</div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props="{&quot;screen&quot;:{&quot;editor&quot;:&quot;enum&quot;,&quot;options&quot;:[&quot;all&quot;,&quot;upload&quot;,&quot;review&quot;,&quot;clinical&quot;,&quot;family&quot;,&quot;reminder&quot;,&quot;medcheck&quot;],&quot;default&quot;:&quot;all&quot;,&quot;tsType&quot;:&quot;string&quot;}}">
+class Component extends DCLogic {
+  renderVals() {
+    const s = this.props.screen ?? 'all';
+    const all = s === 'all';
+    const chip = {
+      green: ['#E3F5EC', '#0E6B41'], red: ['#FDECEC', '#B42318'],
+      amber: ['#FFF3DC', '#8A5300'], blue: ['#EAF0FD', '#1F4FB8'], grey: ['#F1F2F4', '#4A5058']
+    };
+    const C = { g: '#18A058', r: '#E5484D', o: '#F2A93B', e: '#D5D9DE' };
+    const meds = [
+      { name: 'Aspirin', purpose: 'Protects the stent', dose: '81 mg', when: 'Morning', change: 'New', t: 'blue', box: '#E5484D' },
+      { name: 'Clopidogrel', purpose: 'Prevents clots', dose: '75 mg', when: 'Morning', change: 'New', t: 'blue', box: '#2B66E4' },
+      { name: 'Atorvastatin', purpose: 'Lowers cholesterol', dose: '40 mg', when: 'Night', change: 'Dose raised', t: 'amber', box: '#8A5CF6' },
+      { name: 'Bisoprolol', purpose: 'Slows the heart rate', dose: '2.5 mg', when: 'Morning', change: 'Continue', t: 'grey', box: '#18A058' },
+      { name: 'Diltiazem', purpose: 'Old blood-pressure medicine', dose: '60 mg', when: '—', change: 'Stopped', t: 'red', box: '#F2A93B' }
+    ].map(m => ({ ...m, chipBg: chip[m.t][0], chipFg: chip[m.t][1] }));
+    const patients = [
+      { ini: 'AH', name: 'Abdullah Al-Harbi', sub: '67 · Arabic, Najdi', day: '4/30', check: 'Mismatch · 1', cf: 'amber', doses: 'ggr', cg: 'Son called 9:12 PM', status: 'Needs support', t: 'red', hl: true },
+      { ini: 'FQ', name: 'Fatimah Al-Qahtani', sub: '72 · Arabic, Southern', day: '2/30', check: '3 of 4 photos', cf: 'grey', doses: 'go', cg: 'Daughter notified', status: 'No response', t: 'amber' },
+      { ini: 'NH', name: 'Nour Haddad', sub: '64 · Arabic, Levantine', day: '6/30', check: 'Pharmacist review', cf: 'amber', doses: 'gge', cg: 'Nurse called', status: 'Follow-up', t: 'amber' },
+      { ini: 'MS', name: 'Maria Santos', sub: '58 · English', day: '9/30', check: 'Complete', cf: 'green', doses: 'ggg', cg: '—', status: 'On track', t: 'green' },
+      { ini: 'IH', name: 'Imran Hussain', sub: '61 · Urdu', day: '15/30', check: 'Complete', cf: 'green', doses: 'gg', cg: '—', status: 'On track', t: 'green' },
+      { ini: 'SO', name: 'Saad Al-Otaibi', sub: '69 · Arabic, Najdi', day: '21/30', check: 'Complete', cf: 'green', doses: 'gge', cg: 'Wife confirmed dose', status: 'On track', t: 'green' },
+      { ini: 'JP', name: 'John Peters', sub: '55 · English', day: '27/30', check: 'Complete', cf: 'green', doses: 'ggg', cg: '—', status: 'On track', t: 'green' }
+    ].map(p => ({ ...p, doses: p.doses.split('').map(k => C[k]), chipBg: chip[p.t][0], chipFg: chip[p.t][1], checkFg: chip[p.cf][1], rowBg: p.hl ? '#FFF8F7' : '#FFFFFF' }));
+    const checks = [
+      { name: 'Aspirin 81 mg', brand: 'Aspocid 81', box: '#E5484D', result: 'Matches the plan', fg: '#0E6B41', icon: '✅', border: '#FFFFFF' },
+      { name: 'Clopidogrel 75 mg', brand: 'Plavix 75', box: '#2B66E4', result: 'Different brand, same medicine', fg: '#0E6B41', icon: '✅', border: '#FFFFFF' },
+      { name: 'Atorvastatin', brand: 'Lipitor 20', box: '#8A5CF6', result: 'Wrong strength — plan says 40 mg', fg: '#8A5300', icon: '⚠️', border: '#F2C46D' },
+      { name: 'Diltiazem 60 mg', brand: 'Tildiem 60', box: '#F2A93B', result: 'Stopped by your doctor — put it aside', fg: '#B42318', icon: '⛔', border: '#F4B4B4' },
+      { name: 'Bisoprolol 2.5 mg', brand: '?', box: '#D5D9DE', result: 'Not photographed yet', fg: '#646A72', icon: '📷', border: '#FFFFFF' }
+    ];
+    const wave = (n, seed, played) => Array.from({ length: n }, (_, i) => {
+      const v = 0.25 + 0.75 * Math.abs(Math.sin(i * 0.9 + seed) * Math.cos(i * 0.37 + seed * 2));
+      return { h: Math.round(v * 100) + '%', c: i < played ? '#2B66E4' : '#C9D3E6' };
+    });
+    return {
+      pad: all ? '56px' : '0px',
+      labels: all,
+      showUpload: all || s === 'upload', showReview: all || s === 'review', showClinical: all || s === 'clinical',
+      showFamily: all || s === 'family', showReminder: all || s === 'reminder', showMedcheck: all || s === 'medcheck',
+      meds, patients, checks, bars: wave(40, 1.3, 14), barsSmall: wave(28, 2.1, 0)
+    };
+  }
+}
+</script>
+</body>
+</html>

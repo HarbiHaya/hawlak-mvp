@@ -18,8 +18,7 @@ from app.services.whatsapp_factory import build_whatsapp_client
 router = APIRouter()
 
 REMINDER_INSTRUCTION_AR = (
-    "هذا تذكير بدواك. شوفي صورة الدواء. اضغطي واحد إذا أخذتي الجرعة، "
-    "أو اثنين إذا ما أخذتيها."
+    "هذا تذكير بدواك. شوفي صورة الدواء. اضغطي واحد إذا أخذتي الجرعة، أو اثنين إذا ما أخذتيها."
 )
 
 

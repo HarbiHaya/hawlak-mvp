@@ -1,0 +1,34 @@
+{
+  "eventId": "evt_01",
+  "eventType": "pharmacist_review_requested",
+  "eventVersion": 1,
+  "idempotencyKey": "case_01:pharmacist_review_requested:v1",
+  "occurredAt": "2026-10-25T12:00:00Z",
+  "case": {
+    "caseId": "case_01",
+    "patientAlias": "أبو محمد",
+    "phoneE164Masked": "+9665*****123",
+    "expectedBoxCount": 3,
+    "receivedBoxCount": 3
+  },
+  "approvedPlan": {
+    "planId": "plan_01",
+    "version": 1,
+    "sourceHash": "sha256:09576e8aee7dfe40e8bb7165eed814a837d5b9d226f04b8ade37db395c93e66a"
+  },
+  "medicinePhotos": [
+    {
+      "mediaId": "media_01",
+      "objectKey": "cases/case_01/media/01.jpg"
+    },
+    {
+      "mediaId": "media_02",
+      "objectKey": "cases/case_01/media/02.jpg"
+    },
+    {
+      "mediaId": "media_03",
+      "objectKey": "cases/case_01/media/03.jpg"
+    }
+  ],
+  "reviewReason": "expected_photo_count_reached"
+}

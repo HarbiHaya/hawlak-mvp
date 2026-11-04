@@ -1,0 +1,70 @@
+%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R /F2 5 0 R >> >> /Contents 6 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>
+endobj
+5 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding >>
+endobj
+6 0 obj
+<< /Length 1297 >>
+stream
+BT
+56 800 Td
+16 TL
+/F2 13 Tf (SYNTHETIC DISCHARGE PLAN - DEMO ONLY - NOT A REAL PATIENT) Tj T*
+/F1 9 Tf (SYNTHETIC TEST DATA - not clinically reviewed; medical team reviews fixtures before real use) Tj T*
+/F1 11 Tf () Tj T*
+/F1 11 Tf (Record: SYN-DISCHARGE-001    Patient ref: SYN-PAT-001) Tj T*
+/F1 11 Tf (Approved by SYN-CLINICIAN-01 at 2026-10-25T08:00:00Z) Tj T*
+/F1 11 Tf (Plan plan_01, version 1) Tj T*
+/F1 11 Tf () Tj T*
+/F2 11 Tf (NEW MEDICINES) Tj T*
+/F1 11 Tf (1. Fictional medicine A: 5 mg, 1 tablet, once daily \(morning\)) Tj T*
+/F1 11 Tf (2. Fictional medicine B: 10 mg, 1 tablet, once daily \(evening\)) Tj T*
+/F1 11 Tf (3. Fictional medicine C: 20 mg, 1 tablet, twice daily \(morning and evening\)) Tj T*
+/F1 11 Tf () Tj T*
+/F2 11 Tf (STOPPED MEDICINES) Tj T*
+/F1 11 Tf (- Fictional medicine D) Tj T*
+/F1 11 Tf () Tj T*
+/F2 11 Tf (ACTIVITY) Tj T*
+/F1 11 Tf (- Take short, slow walks around the house and rest when tired.) Tj T*
+/F1 11 Tf () Tj T*
+/F2 11 Tf (DIET) Tj T*
+/F1 11 Tf (- Prefer low-salt meals.) Tj T*
+/F1 11 Tf () Tj T*
+/F2 11 Tf (WARNING SIGNS - CALL 997 AT ONCE) Tj T*
+/F1 11 Tf (- New chest pain or pressure) Tj T*
+/F1 11 Tf (- Shortness of breath) Tj T*
+/F1 11 Tf () Tj T*
+/F1 11 Tf (Emergency number: 997) Tj T*
+/F1 11 Tf (Expected medicine-box photos: 3) Tj T*
+ET
+endstream
+endobj
+7 0 obj
+<< /Title (Synthetic discharge plan - demo only) >>
+endobj
+xref
+0 8
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000251 00000 n 
+0000000348 00000 n 
+0000000450 00000 n 
+0000001799 00000 n 
+trailer
+<< /Size 8 /Root 1 0 R /Info 7 0 R >>
+startxref
+1866
+%%EOF

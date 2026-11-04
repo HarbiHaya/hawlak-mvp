@@ -1,0 +1,65 @@
+{
+  "synthetic": true,
+  "reviewStatus": "SYNTHETIC TEST DATA - not clinically reviewed; medical team reviews fixtures before real use",
+  "case": {
+    "caseId": "case_01",
+    "patientRef": "SYN-PAT-001",
+    "patientAlias": "أبو محمد",
+    "dialectCode": "ar-SA-najdi",
+    "expectedBoxCount": 3
+  },
+  "approvedPlan": {
+    "planId": "plan_01",
+    "version": 1,
+    "approvedBy": "SYN-CLINICIAN-01",
+    "approvedAt": "2026-10-25T08:00:00Z",
+    "source": {
+      "system": "synthetic-ehr",
+      "recordId": "SYN-DISCHARGE-001",
+      "document": "approved-plan.abu-mohammed.pdf",
+      "sourceHash": "sha256:09576e8aee7dfe40e8bb7165eed814a837d5b9d226f04b8ade37db395c93e66a"
+    },
+    "clinicalFacts": {
+      "newMedicines": [
+        {
+          "itemId": "MED-001",
+          "name": "Fictional medicine A",
+          "strength": "5 mg",
+          "dose": "1 tablet",
+          "frequency": "once daily",
+          "timing": "morning"
+        },
+        {
+          "itemId": "MED-002",
+          "name": "Fictional medicine B",
+          "strength": "10 mg",
+          "dose": "1 tablet",
+          "frequency": "once daily",
+          "timing": "evening"
+        },
+        {
+          "itemId": "MED-003",
+          "name": "Fictional medicine C",
+          "strength": "20 mg",
+          "dose": "1 tablet",
+          "frequency": "twice daily",
+          "timing": "morning and evening"
+        }
+      ],
+      "stoppedMedicines": [
+        "Fictional medicine D"
+      ],
+      "activityInstructions": [
+        "Take short, slow walks around the house and rest when tired."
+      ],
+      "dietInstructions": [
+        "Prefer low-salt meals."
+      ],
+      "redFlags": [
+        "New chest pain or pressure",
+        "Shortness of breath"
+      ],
+      "emergencyNumber": "997"
+    }
+  }
+}

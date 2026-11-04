@@ -1,0 +1,37 @@
+[project]
+name = "hawlak-api"
+version = "0.1.0"
+description = "Hawlak WhatsApp intake and Arabic voice API"
+requires-python = ">=3.12"
+dependencies = [
+    "alembic>=1.17.2",
+    "boto3>=1.40.0",
+    "elevenlabs>=2.76.0",
+    "fastapi>=0.162.0",
+    "httpx>=0.28.1",
+    "openai>=3.45.0",
+    "psycopg[binary]>=3.2.12",
+    "pydantic-settings>=2.16.1",
+    "sqlalchemy>=2.0.44",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]
+filterwarnings = [
+    # Starlette 1.x steers TestClient users to httpx2; httpx still works. Revisit when moving off httpx.
+    "ignore:Using `httpx` with `starlette.testclient` is deprecated",
+]
+
+[tool.ruff]
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.17.2",
+]

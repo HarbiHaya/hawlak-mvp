@@ -1,6 +1,10 @@
 node_modules/
 dist/
 coverage/
+.venv/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
 .env
 .env.*
 !.env.example
@@ -8,4 +12,5 @@ coverage/
 *.log
 .idea/
 .vscode/
+.project-md-gen/
 

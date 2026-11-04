@@ -1,3 +1,5 @@
+name: hawlak-mvp
+
 services:
   postgres:
     image: postgres:17-alpine
@@ -6,23 +8,77 @@ services:
       POSTGRES_PASSWORD: hawlak
       POSTGRES_DB: hawlak
     ports:
-      - "5432:5432"
+      # Hawlak-only host port; avoids colliding with another local PostgreSQL cluster.
+      - "127.0.0.1:15432:5432"
     volumes:
       - hawlak_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hawlak -d hawlak"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    networks:
+      - hawlak_internal
 
   minio:
     image: minio/minio:latest
     command: server /data --console-address ":9001"
+    restart: unless-stopped
     environment:
-      MINIO_ROOT_USER: hawlak
-      MINIO_ROOT_PASSWORD: replace_me_now
+      MINIO_ROOT_USER: ${S3_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${S3_SECRET_KEY}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      # Hawlak-only host ports; do not reuse Lucidya's MinIO ports.
+      - "127.0.0.1:19000:9000"
+      - "127.0.0.1:19001:9001"
     volumes:
       - hawlak_minio:/data
+    networks:
+      - hawlak_internal
+
+  minio-init:
+    image: quay.io/minio/aistor/mc:RELEASE.2026-09-19T15-24-59Z
+    depends_on:
+      - minio
+    environment:
+      S3_ACCESS_KEY: ${S3_ACCESS_KEY}
+      S3_SECRET_KEY: ${S3_SECRET_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+    entrypoint: >
+      /bin/sh -c '
+      until mc alias set hawlak http://minio:9000 "$$S3_ACCESS_KEY" "$$S3_SECRET_KEY"; do sleep 1; done;
+      mc mb --ignore-existing "hawlak/$$S3_BUCKET";
+      mc anonymous set none "hawlak/$$S3_BUCKET";
+      '
+    restart: "no"
+    networks:
+      - hawlak_internal
+
+  # Opt-in so a plain `docker compose up -d` still starts only Postgres and MinIO:
+  #   docker compose --profile api up -d --build
+  api:
+    build: ./apps/api
+    profiles: ["api"]
+    env_file: .env
+    environment:
+      # Containers reach Hawlak MinIO only through its private Compose network.
+      S3_ENDPOINT: http://minio:9000
+      DATABASE_URL: postgresql+psycopg://hawlak:hawlak@postgres:5432/hawlak
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    ports:
+      - "3000:3000"
+    networks:
+      - hawlak_internal
 
 volumes:
   hawlak_postgres:
   hawlak_minio:
+
+networks:
+  hawlak_internal:
+    driver: bridge
 

@@ -8,7 +8,9 @@
     "packages/*"
   ],
   "scripts": {
-    "dev:api": "npm run dev --workspace @hawlak/api",
+    "dev:api": "uv run --directory apps/api uvicorn app.main:app --reload --reload-dir app --port 3000",
+    "dev:webhook": "uv run --directory apps/api uvicorn app.webhook_main:app --port 3001 --no-access-log",
+    "test:api": "uv run --directory apps/api pytest",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
     "typecheck": "npm run typecheck --workspaces --if-present"

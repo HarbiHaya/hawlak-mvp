@@ -30,16 +30,29 @@ WHATSAPP_ACCESS_TOKEN=<temporary access token>
 WHATSAPP_VERIFY_TOKEN=<a long random string you create>
 META_APP_SECRET=<Settings → Basic → App secret>
 WHATSAPP_TEST_RECIPIENT=+9665XXXXXXXX
+INTERNAL_API_TOKEN=<a separate random string of at least 24 characters>
+DASHBOARD_ORIGIN=http://localhost:5173
 ```
 
 Do not commit `.env`. The temporary developer token is suitable for setup only and expires. Replace it with an appropriate system-user token before any sustained pilot.
 
-## 4. Start the local webhook
+## 4. Start the local API and isolated webhook
+
+Keep the internal API local on port 3000:
 
 ```bash
-npm install
 npm run dev:api
 ```
+
+In a second terminal, start the webhook-only app on port 3001:
+
+```bash
+npm run dev:webhook
+```
+
+The internal API contains authenticated demo and future dashboard routes. Do
+not expose port 3000 through a tunnel. The port-3001 app contains only the Meta
+webhook routes.
 
 Confirm:
 
@@ -47,16 +60,16 @@ Confirm:
 curl http://localhost:3000/health
 ```
 
-Expose the API using an HTTPS tunnel, for example:
+Expose only the webhook app using an HTTPS tunnel, for example:
 
 ```bash
-cloudflared tunnel --url http://localhost:3000
+cloudflared tunnel --url http://localhost:3001
 ```
 
 or:
 
 ```bash
-ngrok http 3000
+ngrok http 3001
 ```
 
 Use the generated HTTPS URL as `PUBLIC_BASE_URL`.
@@ -72,6 +85,14 @@ In **WhatsApp → Configuration**:
 
 The POST route verifies `X-Hub-Signature-256` using `META_APP_SECRET`. Never disable this check for a demo.
 
+Confirm the tunnel does not expose internal routes:
+
+```bash
+curl -o /dev/null -w '%{http_code}\n' -X POST https://YOUR-TUNNEL/internal/demo/send-text
+```
+
+The expected status is `404`.
+
 ## 6. Send the first test message
 
 Use Meta’s API Setup page to send the provided `hello_world` template to the verified recipient. Reply to it from the recipient phone to open the customer-service conversation.
@@ -79,7 +100,11 @@ Use Meta’s API Setup page to send the provided `hello_world` template to the v
 Then test Hawlak’s outbound connection:
 
 ```bash
-curl -X POST http://localhost:3000/internal/demo/send-text
+set -a
+source .env
+set +a
+curl -X POST http://localhost:3000/internal/demo/send-text \
+  -H "Authorization: Bearer $INTERNAL_API_TOKEN"
 ```
 
 Expected response:
@@ -114,6 +139,8 @@ The final API sequence will be:
 - [ ] Temporary access token is still valid.
 - [ ] Test recipient remains verified.
 - [ ] Tunnel URL matches Meta configuration.
+- [ ] Port 3000 remains local and the public tunnel targets only port 3001.
+- [ ] The public tunnel returns 404 for `/internal/demo/send-text`.
 - [ ] Webhook verification succeeds.
 - [ ] `messages` subscription is enabled.
 - [ ] Recipient has replied to the latest template message.

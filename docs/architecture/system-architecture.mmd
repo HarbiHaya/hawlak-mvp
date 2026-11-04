@@ -15,7 +15,8 @@ flowchart LR
   end
 
   subgraph Providers["External providers"]
-    OPENAI["OpenAI text and voice APIs"]
+    OPENAI["OpenAI Responses API<br/>Dialect rewrite only"]
+    ELEVEN["ElevenLabs TTS<br/>Approved Arabic script only"]
     META["Meta WhatsApp Cloud API"]
     OBJECTS[("S3-compatible storage")]
   end
@@ -36,7 +37,8 @@ flowchart LR
   GUARD -->|"pass"| APPROVE
   GUARD -->|"mismatch"| REJECT["Reject and show fact diff"]
   APPROVE --> VOICE
-  VOICE --> OPENAI
+  VOICE --> ELEVEN
+  ELEVEN --> VOICE
   VOICE --> API
   API --> META
   META <--> WA

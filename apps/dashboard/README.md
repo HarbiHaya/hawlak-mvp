@@ -92,3 +92,53 @@ don't copy the reference HTML into the app.
 - Loading, empty, error and success states are implemented.
 - `npm run typecheck`, `npm test` and `npm run build` pass from the repository
   root.
+
+---
+
+## Implementation notes (Retaj)
+
+### First run
+
+```bash
+npm install            # from the repo root; commit the updated package-lock.json
+npm run dev -w apps/dashboard
+```
+
+Open `http://localhost:5173`, enter the API address (`http://localhost:3000`)
+and the `INTERNAL_API_TOKEN` from Haya's `.env`. Or choose **العمل بدون خادم**
+to load `fixtures/expected-review-event.abu-mohammed.json` with no backend.
+
+`@hawlak/contracts` and `fixtures/` are resolved from source through aliases in
+`vite.config.ts` and `tsconfig.json`, so `typecheck`, `test` and `build` do not
+need the contracts package to be built first.
+
+### Behaviour worth knowing
+
+- **One case per dialect.** The API returns `409 case_conflict` if an existing
+  case is re-sent with a different dialect, so the dashboard creates
+  `case_01-hijazi`, `case_01-najdi`, `case_01-janoubi` (and matching plan ids).
+  Re-creating the same dialect with the same number is replay-safe.
+- **Approval** needs a ticked acknowledgement, sends the generated checksum
+  unchanged and a new `Idempotency-Key` per click. A new script remounts the
+  approval step.
+- **Polling** runs every 5 s, one request at a time, follows `nextCursor`, keeps
+  the last cursor when an empty page returns `null`, and upserts by `eventId`.
+  It stops after a `401` until **تحديث الآن** is pressed.
+- **Contract errors** are listed in an amber panel; valid events still show.
+- **Outcomes** are chosen, then confirmed. Double clicks send one request.
+  Retrying the identical decision after a failure reuses its key; any change
+  gets a new key. After success the decision is locked.
+- **Photos** are fetched with the bearer token into object URLs that are revoked
+  when the photo changes or the view unmounts. Nothing interprets them.
+
+### Files
+
+| Path | What it does |
+|---|---|
+| `src/lib/api.ts` | The only code that calls the API |
+| `src/lib/schemas.ts` | Zod shapes for the non-event routes |
+| `src/lib/queue.ts` | Contract validation + replay-safe upsert |
+| `src/hooks/useReviewQueue.ts` | Polling loop |
+| `src/components/SetupScreen.tsx`, `ApprovalStep.tsx` | Screen 1 |
+| `src/components/ReviewScreen.tsx`, `MedicinePhoto.tsx`, `OutcomePanel.tsx` | Screen 2 |
+| `src/styles.css` | Design-system tokens, RTL via logical properties |

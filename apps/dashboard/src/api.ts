@@ -34,6 +34,23 @@ export interface ReviewPage {
   nextCursor: string | null;
 }
 
+export interface TimelineEntry {
+  type: string;
+  occurredAt: string;
+  details: {
+    status?: string;
+    step?: string;
+    deliveryStatus?: string;
+    choice?: string;
+    [key: string]: string | number | undefined;
+  };
+}
+
+export interface CaseTimeline {
+  caseId: string;
+  data: TimelineEntry[];
+}
+
 export type ReviewOutcome =
   | "matched"
   | "mismatch_found"
@@ -77,7 +94,7 @@ export class HawlakApi {
   constructor(
     baseUrl: string,
     private readonly token: string,
-    private readonly fetcher: Fetcher = fetch,
+    private readonly fetcher: Fetcher = globalThis.fetch.bind(globalThis),
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
   }
@@ -111,6 +128,10 @@ export class HawlakApi {
     return this.request(`/internal/cases/${encodeURIComponent(caseId)}/generate-audio-first`, {
       method: "POST",
     });
+  }
+
+  getCaseTimeline(caseId: string): Promise<CaseTimeline> {
+    return this.request(`/internal/cases/${encodeURIComponent(caseId)}/timeline`);
   }
 
   approveAudioFirst(

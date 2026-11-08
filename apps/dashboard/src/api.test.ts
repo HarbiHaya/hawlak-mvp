@@ -66,4 +66,41 @@ describe("HawlakApi", () => {
       "reminder-action-1",
     );
   });
+
+  it("loads the auditable delivery and patient-choice timeline", async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(
+        JSON.stringify({
+          caseId: "case-1",
+          data: [
+            {
+              type: "whatsapp_outbound_audio",
+              occurredAt: "2026-11-08T18:00:00Z",
+              details: {
+                status: "sent",
+                step: "session_summary",
+                deliveryStatus: "delivered",
+              },
+            },
+            {
+              type: "whatsapp_inbound_button",
+              occurredAt: "2026-11-08T18:05:00Z",
+              details: { status: "processed", step: "inbound", choice: "taken" },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const api = new HawlakApi("http://127.0.0.1:3000", "token", fetcher);
+
+    const result = await api.getCaseTimeline("case-1");
+
+    expect(result.data[0]?.details.deliveryStatus).toBe("delivered");
+    expect(result.data[1]?.details.choice).toBe("taken");
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://127.0.0.1:3000/internal/cases/case-1/timeline",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
 });

@@ -162,17 +162,23 @@ class CaseService:
             .where(MessageLog.case_id == case_id)
             .order_by(MessageLog.created_at, MessageLog.id)
         ).all()
-        entries.extend(
-            {
-                "type": f"whatsapp_{message.direction}_{message.message_type}",
-                "occurred_at": message.created_at,
-                "details": {
-                    "status": message.processing_status,
-                    "step": message.outbound_step or "inbound",
-                },
+        for message in messages:
+            details: dict[str, str | int] = {
+                "status": message.processing_status,
+                "step": message.outbound_step or "inbound",
             }
-            for message in messages
-        )
+            if message.delivery_status is not None:
+                details["deliveryStatus"] = message.delivery_status
+            choice = message.normalized_payload.get("buttonPayload")
+            if isinstance(choice, str) and choice:
+                details["choice"] = choice
+            entries.append(
+                {
+                    "type": f"whatsapp_{message.direction}_{message.message_type}",
+                    "occurred_at": message.created_at,
+                    "details": details,
+                }
+            )
 
         media = self.session.scalars(
             select(InboundMedia)

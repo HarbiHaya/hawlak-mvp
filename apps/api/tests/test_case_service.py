@@ -5,7 +5,7 @@ from sqlalchemy import create_engine, event
 from sqlalchemy.orm import Session
 
 from app.db import Base
-from app.models import ApprovedPlan, PatientCase
+from app.models import ApprovedPlan, MessageLog, PatientCase
 from app.schemas.approved_plan import ApprovedPlanDocument
 from app.services.case_service import CaseConflictError, CaseService
 
@@ -79,3 +79,47 @@ def test_non_synthetic_documents_are_rejected(plan):
 
     with pytest.raises(ValueError):
         as_document(changed)
+
+
+def test_timeline_exposes_delivery_status_and_numeric_button_choice(db_session, plan):
+    service = CaseService(db_session)
+    service.create_case(as_document(plan), "+966500000000")
+    db_session.add_all(
+        [
+            MessageLog(
+                case_id="case_01",
+                wa_message_id="MM-outbound",
+                direction="outbound",
+                message_type="audio",
+                processing_status="sent",
+                delivery_status="delivered",
+                normalized_payload={},
+                outbound_step="session_summary",
+                idempotency_key="timeline-outbound",
+            ),
+            MessageLog(
+                case_id="case_01",
+                wa_message_id="MM-inbound",
+                direction="inbound",
+                message_type="button",
+                processing_status="processed",
+                normalized_payload={"buttonPayload": "taken"},
+                idempotency_key="timeline-inbound",
+            ),
+        ]
+    )
+    db_session.commit()
+
+    timeline = service.get_timeline("case_01")
+    message_entries = [entry for entry in timeline if entry["type"].startswith("whatsapp_")]
+
+    assert message_entries[0]["details"] == {
+        "status": "sent",
+        "step": "session_summary",
+        "deliveryStatus": "delivered",
+    }
+    assert message_entries[1]["details"] == {
+        "status": "processed",
+        "step": "inbound",
+        "choice": "taken",
+    }

@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import type { PharmacistReviewRequested } from "@hawlak/contracts";
+import { useEffect, useMemo, useState } from "react";
 
 import fixture from "../../../fixtures/approved-plan.abu-mohammed.json";
 import {
@@ -7,24 +6,17 @@ import {
   HawlakApiError,
   type AudioFirstDraft,
   type DialectCode,
-  type ReviewOutcome,
   type SyntheticPlan,
+  type TimelineEntry,
   type VoiceOptions,
 } from "./api";
-import { mergeReviewEvents } from "./review-queue";
+import { ReviewWorkspace } from "./ReviewWorkspace";
 
 const API_URL = "http://127.0.0.1:3000";
 const SYNTHETIC_PLAN = fixture as unknown as SyntheticPlan;
 
 type Workspace = "send" | "review" | "connection";
 type DemoStage = "setup" | "generating" | "review" | "sending" | "sent";
-
-const outcomeLabels: Record<ReviewOutcome, string> = {
-  matched: "مطابق للخطة",
-  mismatch_found: "يوجد اختلاف",
-  unclear_photo: "الصورة غير واضحة",
-  contact_patient: "تواصل مع المريض",
-};
 
 function BrandMark({ compact = false }: { compact?: boolean }) {
   return (
@@ -132,7 +124,7 @@ function Sidebar({
 }: {
   workspace: Workspace;
   onChange: (workspace: Workspace) => void;
-  reviewCount: number;
+  reviewCount: number | null;
   onLock: () => void;
 }) {
   return (
@@ -143,7 +135,7 @@ function Sidebar({
           <span>إرسال خطة الخروج</span><b>＋</b>
         </button>
         <button className={workspace === "review" ? "active" : ""} onClick={() => onChange("review")}>
-          <span>مراجعة الصيدلي</span><b className="count">{reviewCount}</b>
+          <span>مراجعة الصيدلي</span><b className="count" aria-label={reviewCount === null ? "لم تُحمّل القائمة بعد" : `${reviewCount} للمراجعة`}>{reviewCount ?? "—"}</b>
         </button>
         <button className={workspace === "connection" ? "active" : ""} onClick={() => onChange("connection")}>
           <span>ربط واتساب</span><b className="status-dot" aria-label="وضع تجريبي" />
@@ -157,6 +149,65 @@ function Sidebar({
   );
 }
 
+const deliveryLabels: Record<string, string> = {
+  accepted: "قُبل لدى المزوّد",
+  queued: "في قائمة الإرسال",
+  sent: "أُرسل من المزوّد",
+  delivered: "وصل إلى الهاتف",
+  read: "قُرئ",
+  failed: "فشل التسليم",
+  undelivered: "لم يصل",
+};
+
+function DeliveryTimeline({ api, caseId }: { api: HawlakApi; caseId: string }) {
+  const [entries, setEntries] = useState<TimelineEntry[]>([]);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const timeline = await api.getCaseTimeline(caseId);
+        if (active) {
+          setEntries(timeline.data.filter((entry) => entry.type.startsWith("whatsapp_")));
+          setFailed(false);
+        }
+      } catch {
+        if (active) setFailed(true);
+      }
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [api, caseId]);
+
+  if (failed) return <div className="delivery-note delivery-note--failed">تعذّر تحديث حالة التسليم. حاولي مرة أخرى.</div>;
+
+  const outbound = entries.filter((entry) => entry.type.startsWith("whatsapp_outbound_"));
+  const choices = entries.filter((entry) => entry.details.choice);
+  return (
+    <div className="delivery-timeline" aria-live="polite">
+      {outbound.length === 0 && <span className="delivery-note">ننتظر أول تحديث من المزوّد…</span>}
+      {outbound.map((entry, index) => {
+        const status = entry.details.deliveryStatus ?? "queued";
+        return (
+          <span key={`${entry.occurredAt}-${index}`} className={`delivery-pill delivery-pill--${status}`}>
+            الصوت {index + 1} · {deliveryLabels[status] ?? status}
+          </span>
+        );
+      })}
+      {choices.map((entry) => (
+        <span key={entry.occurredAt} className="delivery-pill delivery-pill--choice">
+          رد المريض: {entry.details.choice === "taken" ? "١ · أخذتها" : "٢ · لم آخذها بعد"}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function SendWorkspace({ api, options }: { api: HawlakApi; options: VoiceOptions }) {
   const [recipient, setRecipient] = useState("");
   const [dialect, setDialect] = useState<DialectCode>("ar-SA-najdi");
@@ -165,6 +216,7 @@ function SendWorkspace({ api, options }: { api: HawlakApi; options: VoiceOptions
   const [approved, setApproved] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [messageIds, setMessageIds] = useState<string[]>([]);
+  const [sentCaseId, setSentCaseId] = useState<string | null>(null);
 
   const validPhone = /^\+[1-9]\d{7,14}$/.test(recipient);
 
@@ -194,6 +246,7 @@ function SendWorkspace({ api, options }: { api: HawlakApi; options: VoiceOptions
         `voice-pack-${crypto.randomUUID()}`,
       );
       setMessageIds(result.messageIds);
+      setSentCaseId(result.caseId);
       setStage("sent");
     } catch (caught) {
       setError(errorMessage(caught));
@@ -205,6 +258,7 @@ function SendWorkspace({ api, options }: { api: HawlakApi; options: VoiceOptions
     setDraft(null);
     setApproved(false);
     setMessageIds([]);
+    setSentCaseId(null);
     setError(null);
     setStage("setup");
   }
@@ -310,165 +364,14 @@ function SendWorkspace({ api, options }: { api: HawlakApi; options: VoiceOptions
 
       {stage === "sent" && (
         <section className="sent-state">
-          <div className="sent-rings"><span>✓</span></div>
-          <p>تم الإرسال إلى رقم الاختبار</p>
-          <h2>وصلت رسالتان صوتيتان، والخطوة التالية هي صور علب الدواء.</h2>
+          <div className="sent-rings"><span>↗</span></div>
+          <p>قُبل طلب الإرسال إلى رقم الاختبار</p>
+          <h2>وُضعت الرسالتان الصوتيتان في قائمة الإرسال. نعرض حالة الوصول الفعلية أدناه.</h2>
           <div className="message-receipts">{messageIds.map((id, index) => <span key={id}>الصوت {index + 1} · {id.slice(-10)}</span>)}</div>
+          {sentCaseId && <DeliveryTimeline api={api} caseId={sentCaseId} />}
           <button className="button button--primary" onClick={reset}>بدء تجربة جديدة</button>
         </section>
       )}
-    </div>
-  );
-}
-
-function MedicinePhoto({ api, mediaId }: { api: HawlakApi; mediaId: string }) {
-  const [url, setUrl] = useState<string | null>(null);
-  const [failed, setFailed] = useState(false);
-
-  useEffect(() => {
-    let objectUrl: string | null = null;
-    let active = true;
-    void api.getMedia(mediaId).then((blob) => {
-      if (!active) return;
-      objectUrl = URL.createObjectURL(blob);
-      setUrl(objectUrl);
-    }).catch(() => active && setFailed(true));
-    return () => {
-      active = false;
-      if (objectUrl) URL.revokeObjectURL(objectUrl);
-    };
-  }, [api, mediaId]);
-
-  if (failed) return <div className="photo-fallback">تعذّر تحميل الصورة</div>;
-  if (!url) return <div className="photo-loading" aria-label="جارٍ تحميل الصورة" />;
-  return <img src={url} alt="صورة علبة دواء أرسلها المريض" />;
-}
-
-function ReviewWorkspace({ api }: { api: HawlakApi }) {
-  const [events, setEvents] = useState<PharmacistReviewRequested[]>([]);
-  const [cursor, setCursor] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [activeEvent, setActiveEvent] = useState<string | null>(null);
-  const [completed, setCompleted] = useState<Record<string, ReviewOutcome>>({});
-  const [reminders, setReminders] = useState<Record<string, "sending" | "sent">>({});
-
-  const poll = useCallback(async () => {
-    try {
-      const page = await api.listReviewEvents(cursor);
-      setEvents((current) => mergeReviewEvents(current, page.data));
-      setCursor(page.nextCursor);
-      setError(null);
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      setLoading(false);
-    }
-  }, [api, cursor]);
-
-  useEffect(() => {
-    void poll();
-    const timer = window.setInterval(() => void poll(), 8000);
-    return () => window.clearInterval(timer);
-  }, [poll]);
-
-  async function decide(event: PharmacistReviewRequested, outcome: ReviewOutcome) {
-    setActiveEvent(event.eventId);
-    setError(null);
-    try {
-      await api.recordOutcome(
-        event.eventId,
-        outcome,
-        "demo-pharmacist-retaj",
-        null,
-        `review-${event.eventId}-${crypto.randomUUID()}`,
-      );
-      setCompleted((current) => ({ ...current, [event.eventId]: outcome }));
-    } catch (caught) {
-      setError(errorMessage(caught));
-    } finally {
-      setActiveEvent(null);
-    }
-  }
-
-  async function sendReminder(event: PharmacistReviewRequested) {
-    const photo = event.medicinePhotos[0];
-    if (!photo) return;
-    setReminders((current) => ({ ...current, [event.eventId]: "sending" }));
-    setError(null);
-    try {
-      const occurrence = `demo-${Date.now().toString(36)}`;
-      await api.sendPhotoReminder(
-        event.case.caseId,
-        photo.mediaId,
-        occurrence,
-        `reminder-${event.eventId}-${crypto.randomUUID()}`,
-      );
-      setReminders((current) => ({ ...current, [event.eventId]: "sent" }));
-    } catch (caught) {
-      setReminders((current) => {
-        const next = { ...current };
-        delete next[event.eventId];
-        return next;
-      });
-      setError(errorMessage(caught));
-    }
-  }
-
-  return (
-    <div className="workspace">
-      <header className="workspace-header">
-        <div><p>قائمة العمل · تتحدث تلقائياً</p><h1>صور تحتاج قرار الصيدلي</h1></div>
-        <button className="button button--ghost" disabled={loading} onClick={() => void poll()}>{loading ? "جارٍ التحديث…" : "تحديث الآن"}</button>
-      </header>
-      {error && <div className="notice notice--error">{error}</div>}
-      {!loading && events.length === 0 && (
-        <section className="empty-state"><span>◎</span><h2>لا توجد صور تنتظر المراجعة</h2><p>عندما يرسل المريض الصور المطلوبة، تظهر هنا تلقائياً.</p></section>
-      )}
-      <div className="review-list">
-        {events.map((event) => (
-          <article className="review-task" key={event.eventId}>
-            <header>
-              <div className="avatar avatar--blue">{event.case.patientAlias.slice(0, 1)}</div>
-              <div><h2>{event.case.patientAlias}</h2><p>{event.case.phoneE164Masked} · الخطة {event.approvedPlan.version}</p></div>
-              <div className="photo-count"><b>{event.case.receivedBoxCount}/{event.case.expectedBoxCount}</b><span>صور مستلمة</span></div>
-            </header>
-            <div className="photo-strip">
-              {event.medicinePhotos.map((photo) => <MedicinePhoto key={photo.mediaId} api={api} mediaId={photo.mediaId} />)}
-            </div>
-            <div className="reminder-action">
-              <div>
-                <b>اختبار تذكير الجرعة</b>
-                <span>يرسل صوتاً يشرح: ١ أخذتها، ٢ لسه — ثم نفس صورة الدواء.</span>
-              </div>
-              <button
-                className="button button--ghost"
-                disabled={!event.medicinePhotos.length || reminders[event.eventId] === "sending" || reminders[event.eventId] === "sent"}
-                onClick={() => void sendReminder(event)}
-              >
-                {reminders[event.eventId] === "sending" ? "جارٍ الإرسال…" : reminders[event.eventId] === "sent" ? "✓ أُرسل التذكير" : "إرسال التذكير الآن"}
-              </button>
-            </div>
-            {completed[event.eventId] ? (
-              <div className="decision-complete">✓ سُجل القرار: {outcomeLabels[completed[event.eventId]]}</div>
-            ) : (
-              <div className="decision-grid">
-                {(Object.keys(outcomeLabels) as ReviewOutcome[]).map((outcome) => (
-                  <button
-                    key={outcome}
-                    disabled={activeEvent === event.eventId}
-                    className={outcome === "matched" ? "decision decision--positive" : outcome === "mismatch_found" ? "decision decision--danger" : "decision"}
-                    onClick={() => void decide(event, outcome)}
-                  >
-                    {outcomeLabels[outcome]}
-                  </button>
-                ))}
-              </div>
-            )}
-            <footer><span>وصلت {new Date(event.occurredAt).toLocaleString("ar-SA")}</span><span>القرار الطبي يبقى للصيدلي</span></footer>
-          </article>
-        ))}
-      </div>
     </div>
   );
 }
@@ -479,9 +382,9 @@ function ConnectionWorkspace() {
       <header className="workspace-header"><div><p>الربط · قرار المنتج</p><h1>من الاختبار إلى هوية حولك</h1></div></header>
       <div className="connection-grid">
         <section className="connection-card connection-card--active">
-          <span className="connection-state">يعمل الآن</span>
+          <span className="connection-state">وضع الاختبار</span>
           <h2>Twilio Sandbox</h2>
-          <p>مناسب للعرض واختبار الدورة كاملة، لكنه رقم مشترك ويعرض اسم وصورة Twilio.</p>
+          <p>مناسب للعرض بعد انضمام رقم المستلم وتفعيل webhook، لكنه رقم مشترك ويعرض اسم وصورة Twilio.</p>
           <ul><li>لا يحتاج اعتماد شركة</li><li>المستلم ينضم بكلمة join</li><li>جلسة الاختبار تُجدد كل ٣ أيام</li></ul>
         </section>
         <section className="connection-card">
@@ -504,6 +407,7 @@ export function App() {
   const [token, setToken] = useState<string | null>(null);
   const [options, setOptions] = useState<VoiceOptions | null>(null);
   const [workspace, setWorkspace] = useState<Workspace>("send");
+  const [reviewCount, setReviewCount] = useState<number | null>(null);
 
   const api = useMemo(() => token ? new HawlakApi(API_URL, token) : null, [token]);
 
@@ -513,10 +417,10 @@ export function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar workspace={workspace} onChange={setWorkspace} reviewCount={0} onLock={() => { setToken(null); setOptions(null); }} />
+      <Sidebar workspace={workspace} onChange={setWorkspace} reviewCount={reviewCount} onLock={() => { setToken(null); setOptions(null); setReviewCount(null); }} />
       <main className="app-main">
         {workspace === "send" && <SendWorkspace api={api} options={options} />}
-        {workspace === "review" && <ReviewWorkspace api={api} />}
+        {workspace === "review" && <ReviewWorkspace api={api} onCountChange={setReviewCount} />}
         {workspace === "connection" && <ConnectionWorkspace />}
       </main>
     </div>

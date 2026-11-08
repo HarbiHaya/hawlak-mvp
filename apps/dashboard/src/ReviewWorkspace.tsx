@@ -5,6 +5,7 @@ import {
   HawlakApi,
   HawlakApiError,
   type ReviewOutcome,
+  type TimelineEntry,
 } from "./api";
 import { mergeReviewEvents } from "./review-queue";
 
@@ -13,6 +14,15 @@ const outcomeLabels: Record<ReviewOutcome, string> = {
   mismatch_found: "يوجد اختلاف",
   unclear_photo: "الصورة غير واضحة",
   contact_patient: "تواصل مع المريض",
+};
+
+const deliveryLabels: Record<string, string> = {
+  queued: "في قائمة الإرسال",
+  sent: "أُرسل من المزوّد",
+  delivered: "وصل إلى الهاتف",
+  read: "قُرئ",
+  failed: "فشل التسليم",
+  undelivered: "لم يصل",
 };
 
 function errorMessage(error: unknown): string {
@@ -46,6 +56,67 @@ function MedicinePhoto({ api, mediaId }: { api: HawlakApi; mediaId: string }) {
   if (failed) return <div className="photo-fallback">تعذّر تحميل الصورة</div>;
   if (!url) return <div className="photo-loading" aria-label="جارٍ تحميل الصورة" />;
   return <img src={url} alt="صورة علبة دواء أرسلها المريض" />;
+}
+
+function CaseAuditSummary({
+  api,
+  caseId,
+  refreshSignal,
+}: {
+  api: HawlakApi;
+  caseId: string;
+  refreshSignal?: string;
+}) {
+  const [entries, setEntries] = useState<TimelineEntry[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    async function load() {
+      try {
+        const result = await api.getCaseTimeline(caseId);
+        if (active) setEntries(result.data);
+      } catch {
+        // The task remains actionable even if the audit poll is temporarily unavailable.
+      }
+    }
+    void load();
+    const timer = window.setInterval(() => void load(), 3000);
+    return () => {
+      active = false;
+      window.clearInterval(timer);
+    };
+  }, [api, caseId, refreshSignal]);
+
+  const reminders = entries.filter(
+    (entry) =>
+      entry.type.startsWith("whatsapp_outbound_") &&
+      String(entry.details.step ?? "").startsWith("medication_"),
+  );
+  const latestReminder = reminders.at(-1);
+  const latestChoice = entries.filter((entry) => entry.details.choice).at(-1);
+
+  return (
+    <div className="case-audit" aria-live="polite">
+      <div>
+        <b>سجل التذكير</b>
+        <span>
+          {latestReminder
+            ? deliveryLabels[latestReminder.details.deliveryStatus ?? "queued"] ?? latestReminder.details.deliveryStatus
+            : "لم يُرسل تذكير لهذه الحالة بعد"}
+        </span>
+      </div>
+      <div>
+        <b>آخر رد من المريض</b>
+        <span>
+          {latestChoice?.details.choice === "taken"
+            ? "١ · أخذتها"
+            : latestChoice?.details.choice === "not_yet"
+              ? "٢ · لم آخذها بعد"
+              : "بانتظار الضغط على ١ أو ٢"}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 export function ReviewWorkspace({
@@ -177,6 +248,11 @@ export function ReviewWorkspace({
                   {reminders[event.eventId] === "sending" ? "جارٍ الإرسال…" : reminders[event.eventId] === "sent" ? "✓ قُبل طلب التذكير" : "إرسال التذكير الآن"}
                 </button>
               </div>
+              <CaseAuditSummary
+                api={api}
+                caseId={event.case.caseId}
+                refreshSignal={reminders[event.eventId]}
+              />
               {completed[event.eventId] ? (
                 <div className="decision-complete">✓ سُجل القرار: {outcomeLabels[completed[event.eventId]]}</div>
               ) : (

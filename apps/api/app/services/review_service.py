@@ -43,6 +43,9 @@ class ReviewService:
             .where(
                 WorkflowEvent.event_type == "pharmacist_review_requested",
                 WorkflowEvent.sequence > sequence,
+                ~select(ReviewOutcome.id)
+                .where(ReviewOutcome.workflow_event_sequence == WorkflowEvent.sequence)
+                .exists(),
             )
             .order_by(WorkflowEvent.sequence)
             .limit(limit)

@@ -106,6 +106,9 @@ def test_polling_media_and_outcome_flow(client, internal_auth_headers, db_sessio
     assert replay.status_code == 200
     assert created.json() == replay.json()
 
+    reloaded_queue = client.get("/internal/review-events", headers=internal_auth_headers)
+    assert reloaded_queue.json()["data"] == []
+
 
 def test_review_routes_enforce_auth_cursor_and_conflicts(client, internal_auth_headers, db_session):
     seed_review_event(db_session)

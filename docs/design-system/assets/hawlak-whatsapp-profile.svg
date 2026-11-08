@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="640" viewBox="0 0 640 640" role="img" aria-labelledby="title desc">
+  <title id="title">Hawlak WhatsApp profile mark</title>
+  <desc id="desc">White Hawlak ring and centre dot on Hawlak blue</desc>
+  <rect width="640" height="640" rx="128" fill="#2B66E4"/>
+  <path
+    d="M501.9 238.9A208 208 0 1 1 408.7 143"
+    fill="none"
+    stroke="#FFFFFF"
+    stroke-width="58"
+    stroke-linecap="round"
+  />
+  <circle cx="320" cy="320" r="74" fill="#FFFFFF"/>
+</svg>

@@ -13,7 +13,7 @@ before audio is generated or sent.
 | Path | Purpose |
 |---|---|
 | `apps/api` | FastAPI backend, provider integrations, persistence and tests |
-| `apps/dashboard` | Retaj's React/Vite dashboard workspace and handoff |
+| `apps/dashboard` | Arabic-first React/Vite operator and pharmacist dashboard |
 | `packages/contracts` | Shared Zod event contract |
 | `fixtures` | Synthetic أبو محمد demo input and expected event |
 | `docs/integration-contract.md` | Dashboard/API contract |
@@ -44,6 +44,7 @@ cp .env.example .env
 docker compose up -d postgres minio minio-init
 npm ci
 npm run dev:api
+npm run dev -w apps/dashboard
 ```
 
 Fill `.env` with local credentials before using live providers. Keep
@@ -100,20 +101,24 @@ The fixture is intentionally fictional and is not clinically reviewed. For a
 controlled live test-number rehearsal, follow
 [`docs/live-demo-runbook.md`](docs/live-demo-runbook.md).
 
-## Dashboard handoff
+## Dashboard and complete prototype
 
-Retaj should start with [`apps/dashboard/README.md`](apps/dashboard/README.md)
-and [`docs/integration-contract.md`](docs/integration-contract.md). The backend
-already provides:
+The dashboard is implemented in [`apps/dashboard`](apps/dashboard/README.md).
+It creates a fresh synthetic case, generates and approves the two-note
+audio-first bundle, polls the pharmacist queue, loads stored photos and records
+review outcomes. It can also trigger the complete low-literacy reminder:
+spoken `١/٢` guidance, the patient's stored photo and numeric quick replies.
 
-- a validated Hijazi, Najdi and Southern Saudi dialect catalog;
-- synthetic case creation and exact-script approval;
-- pharmacist review-event polling;
-- authenticated medicine-photo retrieval;
-- idempotent review outcomes.
+The end-to-end product and safety decisions are in
+[`docs/prototype-solution.md`](docs/prototype-solution.md). To replace the
+Twilio-branded Sandbox with a dedicated sender, run:
 
-The shared event contract and offline fixture let dashboard work begin without
-OpenAI, ElevenLabs, WhatsApp, PostgreSQL or MinIO running.
+```bash
+./scripts/setup_twilio_sender.sh
+```
+
+The wizard uses the prepared 640×640 Hawlak profile asset and writes only the
+required local `.env` values.
 
 ## Collaboration rules
 

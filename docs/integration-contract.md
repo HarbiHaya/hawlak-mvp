@@ -76,29 +76,54 @@ codes are `ar-SA-hijazi`, `ar-SA-najdi`, and `ar-SA-janoubi`. The response also
 shows the server-configured voice label, model and language so the operator can
 confirm that a native Saudi Arabic voice—not an English premade voice—is active.
 
-### Script review and approval
+### Audio-first script review and approval
 
 The operator screen uses this sequence:
 
 1. `POST /internal/cases` with the synthetic approved-plan document, demo
    recipient and selected `case.dialectCode`.
-2. `POST /internal/cases/{caseId}/generate-script` to receive `artifactId`,
-   `spokenTextAr`, `scriptChecksum` and the fact report.
-3. Display the entire script. Do not edit it in the browser.
+2. `POST /internal/cases/{caseId}/generate-audio-first` to receive two scripts,
+   their artifact IDs, individual checksums, the bundle `approvalChecksum` and
+   the fact report.
+3. Display both scripts completely. Do not edit them in the browser.
 4. After explicit approval, call
-   `POST /internal/cases/{caseId}/approve-and-send` with:
+   `POST /internal/cases/{caseId}/approve-audio-first-and-send` with:
 
 ```json
 {
-  "artifactId": "<artifactId from generation>",
-  "scriptChecksum": "<unchanged checksum from generation>",
+  "sessionArtifactId": "<session-summary artifact ID>",
+  "recoveryArtifactId": "<recovery-warning artifact ID>",
+  "approvalChecksum": "<unchanged bundle checksum>",
   "approvedBy": "demo-operator-01"
 }
 ```
 
 The approval request also requires a new `Idempotency-Key` header. The backend
-rejects a changed checksum and sends disclosure, audio and photo request in that
-order. The dashboard must never approve automatically.
+rejects a changed checksum and sends exactly two audio notes. The first note
+contains the spoken disclosure, medicine summary and photo request; the second
+contains recovery guidance and warning signs. The dashboard must never approve
+automatically.
+
+### Audio-guided numeric reminder
+
+After at least one stored patient photo exists, the operator can run:
+
+```http
+POST /internal/cases/{caseId}/send-photo-reminder
+Authorization: Bearer <internal-dashboard-token>
+Content-Type: application/json
+Idempotency-Key: <unique-reminder-action-id>
+
+{
+  "mediaId": "<stored inbound media ID>",
+  "reminderId": "<unique occurrence ID>"
+}
+```
+
+The backend first sends a Saudi Arabic voice instruction explaining that `١`
+means taken and `٢` means not yet. It then sends the same stored photo with two
+numeric quick replies. Visible titles stay numeric while hidden button payloads
+remain `taken` and `not_yet` for the audit trail.
 
 ### Authenticated medicine photos
 

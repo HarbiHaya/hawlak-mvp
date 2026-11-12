@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import logging
+from collections.abc import Coroutine
+from typing import Any
 
 from livekit import api
 from livekit.agents import (
@@ -18,7 +21,8 @@ from livekit.agents.llm import StopResponse
 from livekit.plugins import elevenlabs, openai
 
 from .classifier import AnswerClassifier, ClassificationError, OpenAIAnswerClassifier
-from .conversation import AnswerKind, CallActionKind, CallConversation, CallPlan
+from .conversation import AnswerKind, CallAction, CallActionKind, CallConversation, CallPlan
+from .outcome_client import CallOutcomeClient
 from .plan_client import ApprovedPlanClient
 from .settings import AgentSettings
 
@@ -35,6 +39,7 @@ class HawlakFollowUpAgent(Agent):
         plan: CallPlan,
         classifier: AnswerClassifier,
         participant_identity: str,
+        outcome_client: CallOutcomeClient,
     ) -> None:
         super().__init__(
             instructions=(
@@ -48,8 +53,11 @@ class HawlakFollowUpAgent(Agent):
             ),
         )
         self.conversation = CallConversation(plan)
+        self._plan = plan
         self.classifier = classifier
         self.participant_identity = participant_identity
+        self.outcome_client = outcome_client
+        self._outcome_tasks: set[asyncio.Task[None]] = set()
 
     async def begin(self) -> None:
         await self.session.say(
@@ -71,24 +79,116 @@ class HawlakFollowUpAgent(Agent):
         action = self.conversation.record_answer(answer)
         await self.session.say(action.spoken_text, allow_interruptions=False)
 
-        if action.kind is CallActionKind.TRANSFER:
-            await self._transfer(action.transfer_to)
-        elif action.kind is CallActionKind.COMPLETE:
-            await self._end_call()
+        if action.kind in {CallActionKind.TRANSFER, CallActionKind.COMPLETE}:
+            await self._handle_terminal_action(action)
         raise StopResponse()
 
-    async def _transfer(self, transfer_to: str | None) -> None:
-        if not transfer_to:
-            await self._end_call()
-            return
-        ctx = get_job_context()
-        await ctx.api.sip.transfer_sip_participant(
-            api.TransferSIPParticipantRequest(
-                room_name=ctx.room.name,
-                participant_identity=self.participant_identity,
-                transfer_to=f"tel:{transfer_to}",
+    async def _handle_terminal_action(self, action: CallAction) -> None:
+        if action.kind is CallActionKind.TRANSFER:
+            if action.question_id is None or action.answer_kind is None:
+                raise ValueError("transfer action is missing its escalation outcome")
+            transferred = await self._attempt_transfer(action.transfer_to)
+            if transferred:
+                outcome_task = self._start_outcome_task(
+                    self.outcome_client.record_transferred(
+                        self._plan.id,
+                        question_id=action.question_id,
+                        answer_kind=action.answer_kind,
+                    )
+                )
+                await self._wait_for_outcome(outcome_task)
+                return
+            outcome_task = self._start_outcome_task(
+                self.outcome_client.record_failed(
+                    self._plan.id,
+                    question_id=action.question_id,
+                    answer_kind=action.answer_kind,
+                )
             )
-        )
+        elif action.kind is CallActionKind.COMPLETE:
+            outcome_task = self._start_outcome_task(
+                self.outcome_client.record_completed(self._plan.id)
+            )
+        else:
+            return
+
+        try:
+            await self._attempt_end_call()
+        finally:
+            await self._wait_for_outcome(outcome_task)
+
+    async def _attempt_transfer(self, transfer_to: str | None) -> bool:
+        try:
+            return await self._transfer(transfer_to)
+        except Exception as exc:
+            logger.error(
+                "sip transfer failed",
+                extra={"error_type": type(exc).__name__},
+            )
+            return False
+
+    async def _attempt_end_call(self) -> None:
+        try:
+            await self._end_call()
+        except Exception as exc:
+            logger.error(
+                "room teardown failed",
+                extra={"error_type": type(exc).__name__},
+            )
+
+    def _start_outcome_task(
+        self,
+        report: Coroutine[Any, Any, None],
+    ) -> asyncio.Task[None]:
+        task = asyncio.create_task(report)
+        self._outcome_tasks.add(task)
+        task.add_done_callback(self._outcome_finished)
+        return task
+
+    def _outcome_finished(self, task: asyncio.Task[None]) -> None:
+        self._outcome_tasks.discard(task)
+        if task.cancelled():
+            return
+        if exc := task.exception():
+            logger.error(
+                "call outcome reporting failed",
+                extra={"error_type": type(exc).__name__},
+            )
+
+    @staticmethod
+    async def _wait_for_outcome(task: asyncio.Task[None]) -> None:
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            pass
+
+    async def _transfer(self, transfer_to: str | None) -> bool:
+        if not transfer_to:
+            return False
+        ctx = get_job_context()
+        try:
+            response = await ctx.api.sip.transfer_sip_participant(
+                api.TransferSIPParticipantRequest(
+                    room_name=ctx.room.name,
+                    participant_identity=self.participant_identity,
+                    transfer_to=f"tel:{transfer_to}",
+                )
+            )
+        except Exception as exc:
+            logger.error(
+                "sip transfer failed",
+                extra={"error_type": type(exc).__name__},
+            )
+            return False
+        if response.status != api.STS_TRANSFER_SUCCESSFUL:
+            logger.error(
+                "sip transfer failed",
+                extra={"error_type": "UnexpectedTransferStatus"},
+            )
+            return False
+        return True
 
     async def _end_call(self) -> None:
         ctx = get_job_context()
@@ -135,6 +235,10 @@ async def outbound_follow_up(ctx: JobContext) -> None:
         plan=plan,
         classifier=classifier,
         participant_identity=participant_identity,
+        outcome_client=CallOutcomeClient(
+            settings.hawlak_api_base_url,
+            settings.hawlak_internal_api_token,
+        ),
     )
     session = AgentSession(
         stt=openai.STT(

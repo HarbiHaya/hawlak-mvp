@@ -2,6 +2,15 @@ import {
   PharmacistReviewRequestedSchema,
   type PharmacistReviewRequested,
 } from "@hawlak/contracts";
+import type { UserRole } from "./routing";
+
+export interface DemoSession {
+  accessToken: string;
+  role: UserRole;
+  username: string;
+  displayName: string;
+  expiresAt: string;
+}
 
 export type DialectCode = "ar-SA-hijazi" | "ar-SA-najdi" | "ar-SA-janoubi";
 
@@ -202,6 +211,34 @@ export class HawlakApi {
     private readonly fetcher: Fetcher = globalThis.fetch.bind(globalThis),
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
+  }
+
+  static async login(
+    baseUrl: string,
+    username: string,
+    password: string,
+    fetcher: Fetcher = globalThis.fetch.bind(globalThis),
+  ): Promise<DemoSession> {
+    const normalizedBase = baseUrl.replace(/\/$/, "");
+    const response = await fetcher(`${normalizedBase}/auth/login`, {
+      method: "POST",
+      headers: new Headers({
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      }),
+      body: JSON.stringify({ username, password }),
+    });
+    if (!response.ok) {
+      let code = `request_failed_${response.status}`;
+      try {
+        const body = (await response.json()) as { error?: string };
+        code = body.error ?? code;
+      } catch {
+        // Authentication errors intentionally expose no transport details.
+      }
+      throw new HawlakApiError(response.status, code);
+    }
+    return response.json() as Promise<DemoSession>;
   }
 
   getVoiceOptions(): Promise<VoiceOptions> {

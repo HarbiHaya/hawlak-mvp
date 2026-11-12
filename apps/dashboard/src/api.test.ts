@@ -3,6 +3,37 @@ import { describe, expect, it, vi } from "vitest";
 import { HawlakApi } from "./api";
 
 describe("HawlakApi", () => {
+  it("starts a role-scoped demo session with username and password", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          accessToken: "signed-session-token",
+          role: "admin",
+          username: "admin",
+          displayName: "إدارة العرض",
+          expiresAt: "2026-11-13T12:00:00Z",
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+
+    const session = await HawlakApi.login(
+      "http://127.0.0.1:3000",
+      "admin",
+      "synthetic-demo-password",
+      fetcher,
+    );
+
+    expect(session.role).toBe("admin");
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect(url).toBe("http://127.0.0.1:3000/auth/login");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      username: "admin",
+      password: "synthetic-demo-password",
+    });
+    expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+  });
+
   it("keeps the operator token in the authorization header and loads dialect options", async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(

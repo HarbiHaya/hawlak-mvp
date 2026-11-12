@@ -49,12 +49,13 @@ class Settings(BaseSettings):
     elevenlabs_stability: float = Field(default=0.35, ge=0, le=1)
     elevenlabs_similarity_boost: float = Field(default=0.8, ge=0, le=1)
 
-    # Hawlak's S3-compatible storage. Local development uses the isolated MinIO service.
-    s3_endpoint: str = Field(pattern=r"^https?://[^\s]+$")
+    # Hawlak's S3-compatible storage. Local development uses the isolated MinIO service;
+    # on AWS leave endpoint and keys unset so the instance role is used.
+    s3_endpoint: str | None = Field(default=None, pattern=r"^https?://[^\s]+$")
     s3_region: str = Field(default="us-east-1", min_length=1)
     s3_bucket: str = Field(pattern=r"^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")
-    s3_access_key: str = Field(min_length=1)
-    s3_secret_key: SecretStr = Field(min_length=8)
+    s3_access_key: str | None = Field(default=None, min_length=1)
+    s3_secret_key: SecretStr | None = Field(default=None, min_length=8)
 
     @field_validator("dashboard_origin")
     @classmethod

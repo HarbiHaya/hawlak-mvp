@@ -97,9 +97,14 @@ export interface CallQuestion {
   prompt: string;
 }
 
+export type CallRepeat = "none" | "daily" | "every_2_days" | "weekly";
+
 export interface CallPlan {
   enabled: boolean;
   scheduledAfterHours: number;
+  firstCallAt?: string | null;
+  repeat?: CallRepeat;
+  occurrences?: number;
   openingScript: string;
   questions: CallQuestion[];
   completionScript: string;
@@ -113,6 +118,7 @@ export interface DeliveryRun {
   kind: "discharge_voice_note" | "medication_reminder" | "follow_up_call";
   status: string;
   scheduledAt: string;
+  providerRef?: string | null;
 }
 
 export interface WorkspaceCaseDetail extends WorkspaceCaseSummary {
@@ -122,19 +128,62 @@ export interface WorkspaceCaseDetail extends WorkspaceCaseSummary {
   dischargeVoiceNote: DischargeVoiceNote;
   medications: WorkspaceMedication[];
   callPlan: CallPlan;
+  insurance: InsuranceRecord | null;
+  deliveryMode?: "mock" | "live";
+  generatedDraft: GeneratedDraft | null;
   approvedBy: string | null;
   approvedAt: string | null;
   deliveryRuns: DeliveryRun[];
 }
 
+export interface InsuranceRecord {
+  memberId: string;
+  status: "eligible" | "not_eligible" | "not_found";
+  reason?: string;
+  policyNumber?: string;
+  plan?: string;
+  network?: string;
+  coverageStart?: string;
+  coverageEnd?: string;
+  program?: string;
+  caseManager?: { name: string; phoneE164: string };
+  checkedAt?: string;
+  enrollmentReference?: string;
+  enrolledAt?: string;
+}
+
+export interface GeneratedDraft {
+  voiceScript: string;
+  reminderScripts: Record<string, string>;
+  callOpening: string;
+  callQuestions: CallQuestion[];
+  callCompletion: string;
+  callTransfer: string;
+  generator: string;
+  sourceLanguage: "ar" | "en";
+  notes: string[];
+  generatedAt: string;
+}
+
 export interface WorkspaceAlert {
   id: string;
   caseId: string;
+  patientName: string | null;
   type: string;
   severity: string;
   status: "open" | "resolved";
   summary: string;
   createdAt: string;
+}
+
+export interface DischargeExtraction {
+  status: "parsed" | "no_text" | "unreadable";
+  language: "ar" | "en";
+  text: string;
+  medications: Array<{ name: string; instruction: string }>;
+  stoppedMedications: string[];
+  sections: Array<{ heading: string; items: string[] }>;
+  notes: string[];
 }
 
 export interface CaregiverCase {
@@ -153,6 +202,7 @@ export interface CaregiverCase {
 export interface ApprovalResult {
   caseId: string;
   reviewStatus: "approved";
+  insurance: InsuranceRecord | null;
   deliveryRuns: DeliveryRun[];
 }
 
@@ -161,6 +211,7 @@ export interface SubmitDischargePacket {
   patientFullName: string;
   preferredAddress?: string;
   phoneE164: string;
+  memberId?: string;
   languageCode: "ar" | "en";
   dialectCode: DialectCode;
 }
@@ -308,6 +359,7 @@ export class HawlakApi {
         patientName: packet.patientFullName,
         preferredFormOfAddress: packet.preferredAddress || null,
         phoneE164: packet.phoneE164,
+        memberId: packet.memberId || null,
         languageCode: packet.languageCode,
         dialectCode: packet.dialectCode,
         sourceDocument: stored,
@@ -315,8 +367,29 @@ export class HawlakApi {
     });
   }
 
+  regenerateDrafts(caseId: string): Promise<WorkspaceCaseDetail> {
+    return this.request(`/internal/workspace/cases/${encodeURIComponent(caseId)}/draft`, { method: "POST" });
+  }
+
+  checkEligibility(caseId: string, memberId: string): Promise<WorkspaceCaseDetail> {
+    return this.request(`/internal/workspace/cases/${encodeURIComponent(caseId)}/eligibility`, {
+      method: "POST",
+      body: JSON.stringify({ memberId }),
+    });
+  }
+
+  getCaseExtraction(caseId: string): Promise<DischargeExtraction> {
+    return this.request(`/internal/workspace/cases/${encodeURIComponent(caseId)}/extraction`);
+  }
+
   listWorkspaceAlerts(): Promise<{ data: WorkspaceAlert[] }> {
     return this.request("/internal/workspace/alerts");
+  }
+
+  resolveWorkspaceAlert(alertId: string): Promise<{ id: string; status: "resolved" }> {
+    return this.request(`/internal/workspace/alerts/${encodeURIComponent(alertId)}/resolve`, {
+      method: "POST",
+    });
   }
 
   uploadMedicationImage(
@@ -394,6 +467,17 @@ export class HawlakApi {
     };
   }
 
+  async getCaseFile(caseId: string, key: string): Promise<Blob> {
+    const response = await this.fetcher(
+      `${this.baseUrl}/internal/workspace/cases/${encodeURIComponent(caseId)}/files?key=${encodeURIComponent(key)}`,
+      { headers: this.headers() },
+    );
+    if (!response.ok) {
+      throw await this.errorFrom(response);
+    }
+    return response.blob();
+  }
+
   async getMedia(mediaId: string): Promise<Blob> {
     const response = await this.fetcher(
       `${this.baseUrl}/internal/media/${encodeURIComponent(mediaId)}`,
@@ -463,8 +547,10 @@ export class HawlakApi {
   private async errorFrom(response: Response): Promise<HawlakApiError> {
     let code = `request_failed_${response.status}`;
     try {
-      const body = (await response.json()) as { error?: string; detail?: string };
-      code = body.error ?? body.detail ?? code;
+      const body = (await response.json()) as { error?: string; detail?: unknown };
+      // FastAPI validation errors arrive as a list in `detail`.
+      const detail = typeof body.detail === "string" ? body.detail : body.detail ? "validation_failed" : undefined;
+      code = body.error ?? detail ?? code;
     } catch {
       // Provider and credential details are intentionally not surfaced in the UI.
     }

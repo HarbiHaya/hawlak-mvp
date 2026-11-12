@@ -4,6 +4,7 @@ def synthetic_intake() -> dict:
         "patientName": "مها سالم التجريبية",
         "preferredFormOfAddress": "أم سالم",
         "phoneE164": "+966500000000",
+        "memberId": "SYN-4471203",
         "languageCode": "ar",
         "dialectCode": "ar-SA-najdi",
         "sourceDocument": {
@@ -38,6 +39,9 @@ def synthetic_reviewed_content() -> dict:
         "callPlan": {
             "enabled": True,
             "scheduledAfterHours": 24,
+            "firstCallAt": None,
+            "repeat": "none",
+            "occurrences": 1,
             "openingScript": "سأسألك الآن الأسئلة التي اعتمدها فريق الرعاية.",
             "questions": [{"id": "synthetic-check", "prompt": "هل تحتاج مساعدة؟"}],
             "completionScript": "شكرا، انتهت المتابعة التجريبية.",

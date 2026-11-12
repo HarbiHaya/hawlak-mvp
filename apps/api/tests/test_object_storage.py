@@ -112,3 +112,18 @@ def test_creates_a_short_lived_download_url(storage, fake_s3):
         },
         "ExpiresIn": 120,
     }
+
+
+def test_uses_the_aws_credential_chain_when_no_keys_are_configured(settings, monkeypatch):
+    seen = {}
+    monkeypatch.setattr(
+        "app.services.object_storage.boto3.client", lambda *a, **kw: seen.update(kw)
+    )
+    aws = settings.model_copy(
+        update={"s3_endpoint": None, "s3_access_key": None, "s3_secret_key": None}
+    )
+
+    ObjectStorage(aws)
+
+    assert seen["endpoint_url"] is None
+    assert "aws_access_key_id" not in seen and "aws_secret_access_key" not in seen

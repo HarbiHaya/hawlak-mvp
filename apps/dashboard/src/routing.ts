@@ -33,21 +33,21 @@ const routesByRole: Record<UserRole, ProductRoute[]> = {
 
 const navByRole: Record<UserRole, NavItem[]> = {
   hospital: [
-    { path: "/hospital/intake", labelAr: "إدخال حالة", labelEn: "New case", icon: "file-plus-2" },
+    { path: "/hospital/intake", labelAr: "تسجيل حالة", labelEn: "Register case", icon: "file-plus-2" },
   ],
   insurer: [
     { path: "/insurer/cases", labelAr: "الحالات", labelEn: "Cases", icon: "briefcase-medical" },
     { path: "/insurer/alerts", labelAr: "التنبيهات", labelEn: "Alerts", icon: "bell" },
   ],
   caregiver: [
-    { path: "/caregiver/status", labelAr: "حالة المتابعة", labelEn: "Follow-up status", icon: "heart-handshake" },
+    { path: "/caregiver/status", labelAr: "متابعة الحالة", labelEn: "Patient follow-up", icon: "heart-handshake" },
   ],
   admin: [
     { path: "/admin", labelAr: "نظرة عامة", labelEn: "Overview", icon: "layout-dashboard" },
     { path: "/admin/hospital", labelAr: "المستشفى", labelEn: "Hospital", icon: "hospital" },
-    { path: "/admin/insurer/cases", labelAr: "حالات التأمين", labelEn: "Insurer cases", icon: "briefcase-medical" },
+    { path: "/admin/insurer/cases", labelAr: "حالات الرعاية المتكاملة", labelEn: "Integrated care cases", icon: "briefcase-medical" },
     { path: "/admin/insurer/alerts", labelAr: "التنبيهات", labelEn: "Alerts", icon: "bell" },
-    { path: "/admin/caregiver", labelAr: "مقدم الرعاية", labelEn: "Caregiver", icon: "heart-handshake" },
+    { path: "/admin/caregiver", labelAr: "مرافق المريض", labelEn: "Caregiver", icon: "heart-handshake" },
   ],
 };
 

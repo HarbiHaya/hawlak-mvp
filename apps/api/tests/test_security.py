@@ -91,3 +91,18 @@ def test_cors_rejects_every_other_origin(client):
 
     assert response.status_code == 400
     assert "access-control-allow-origin" not in response.headers
+
+
+def test_cors_allows_upload_headers_and_the_loopback_twin_origin(client, settings):
+    for origin in (settings.dashboard_origin, "http://127.0.0.1:5173"):
+        response = client.options(
+            "/internal/workspace/documents",
+            headers={
+                "Origin": origin,
+                "Access-Control-Request-Method": "POST",
+                "Access-Control-Request-Headers": "authorization,content-type,x-case-id,x-filename",
+            },
+        )
+
+        assert response.status_code == 200, origin
+        assert response.headers["access-control-allow-origin"] == origin

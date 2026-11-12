@@ -13,10 +13,10 @@
     "test:api": "uv run --directory apps/api pytest",
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
-    "typecheck": "npm run typecheck --workspaces --if-present"
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "dev:worker": "uv run --directory apps/api python -m app.delivery_worker"
   },
   "engines": {
     "node": ">=22"
   }
 }
-

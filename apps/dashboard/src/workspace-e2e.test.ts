@@ -120,6 +120,9 @@ const exactReviewedContent: Pick<
   callPlan: {
     enabled: false,
     scheduledAfterHours: 24,
+    firstCallAt: null,
+    repeat: "none",
+    occurrences: 1,
     openingScript: "",
     questions: [],
     completionScript: "",

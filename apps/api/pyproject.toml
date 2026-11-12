@@ -12,6 +12,7 @@ dependencies = [
     "openai>=3.45.0",
     "psycopg[binary]>=3.2.12",
     "pydantic-settings>=2.16.1",
+    "pypdf>=7.0.1",
     "sqlalchemy>=2.0.44",
     "uvicorn[standard]>=0.54.0",
 ]

@@ -73,6 +73,10 @@ class CareJourney(Base):
     discharge_voice_note: Mapped[dict[str, Any]] = mapped_column(JSON_VALUE)
     medications: Mapped[list[dict[str, Any]]] = mapped_column(JSON_VALUE)
     call_plan: Mapped[dict[str, Any]] = mapped_column(JSON_VALUE)
+    # Insurer member, eligibility check and enrollment reference.
+    insurance: Mapped[dict[str, Any] | None] = mapped_column(JSON_VALUE, nullable=True)
+    # What Hawlak drafted, kept so reviewers can see what was edited.
+    generated_draft: Mapped[dict[str, Any] | None] = mapped_column(JSON_VALUE, nullable=True)
     review_status: Mapped[str] = mapped_column(String(20), default="draft")
     approved_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
     approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

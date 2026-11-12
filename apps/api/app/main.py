@@ -31,12 +31,21 @@ class ExactDashboardCORSMiddleware(CORSMiddleware):
             app,
             allow_origins=[],
             allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
-            allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
+            allow_headers=[
+                "Authorization",
+                "Content-Type",
+                "Idempotency-Key",
+                "X-Case-Id",
+                "X-Filename",
+            ],
             allow_credentials=False,
         )
 
     def is_allowed_origin(self, origin: str) -> bool:
-        return compare_digest(origin, self._origin_provider())
+        configured = self._origin_provider()
+        # Vite prints http://127.0.0.1:<port>; accept it as the same local dashboard.
+        loopback_twin = configured.replace("http://localhost:", "http://127.0.0.1:", 1)
+        return compare_digest(origin, configured) or compare_digest(origin, loopback_twin)
 
 
 app = FastAPI(title="Hawlak API", lifespan=lifespan)

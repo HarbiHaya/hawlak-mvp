@@ -46,6 +46,8 @@ def _dashboard_roles(method: str, path: str) -> set[str]:
         return admin | ({"hospital"} if method == "POST" else {"insurer"})
     if path == "/internal/workspace/alerts" and method == "GET":
         return admin | {"insurer"}
+    if path.startswith("/internal/workspace/alerts/") and path.endswith("/resolve"):
+        return admin | {"insurer"} if method == "POST" else set()
     if path.startswith("/internal/workspace/cases/"):
         return admin | {"insurer"}
     if path.startswith("/internal/caregiver/cases/") and method == "GET":

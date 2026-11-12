@@ -1,8 +1,10 @@
+from pathlib import PurePosixPath
 from typing import Annotated
 
-from fastapi import APIRouter, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Request, Response
 from fastapi.responses import JSONResponse
 
+from app.config import get_settings
 from app.db import SessionDep
 from app.models import CareJourney
 from app.schemas.care_journey import (
@@ -11,12 +13,17 @@ from app.schemas.care_journey import (
     CareJourneyContent,
     CareJourneyCreate,
     DeliveryRunUpdate,
+    EligibilityRequest,
 )
 from app.services.care_journey_service import (
+    DEFAULT_CALL_PLAN,
     CareJourneyService,
     JourneyConflict,
     JourneyNotFound,
+    drafted_content,
 )
+from app.services.discharge_parser import draft_medications, parse_discharge_pdf
+from app.services.journey_drafter import build_journey_drafter
 from app.services.object_storage import ObjectStorageError, StorageDep
 
 router = APIRouter()
@@ -27,6 +34,15 @@ MEDICATION_IMAGE_TYPES = {
     "image/png": (b"\x89PNG\r\n\x1a\n",),
     "image/webp": (b"RIFF",),
 }
+FILE_TYPES = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg"}
+FILE_TYPES |= {".jpeg": "image/jpeg", ".webp": "image/webp"}
+
+
+def get_journey_drafter():
+    return build_journey_drafter(get_settings())
+
+
+DrafterDep = Annotated[object, Depends(get_journey_drafter)]
 
 
 def error_response(exc: RuntimeError):
@@ -106,9 +122,32 @@ async def upload_medication_image(
 
 
 @router.post("/workspace/cases", status_code=201)
-def create_workspace_case(body: CareJourneyCreate, response: Response, session: SessionDep):
+def create_workspace_case(
+    body: CareJourneyCreate,
+    response: Response,
+    session: SessionDep,
+    storage: StorageDep,
+    drafter: DrafterDep,
+):
+    content = generated = None
+    is_new = session.get(CareJourney, body.case_id) is None
+    if is_new and body.medications is None and body.discharge_voice_note is None:
+        # Draft the insurer's review from the hospital PDF. Approval still gates every word.
+        pdf = _case_bytes(body.case_id, body.source_document.object_key, storage)
+        extraction = parse_discharge_pdf(pdf) if pdf else None
+        if extraction is not None and extraction.status == "parsed":
+            drafted, generated = drafted_content(
+                extraction,
+                drafter,
+                medications=draft_medications(extraction),
+                call_plan=DEFAULT_CALL_PLAN,
+                label=body.preferred_form_of_address or body.patient_name,
+                language=body.language_code,
+                dialect=body.dialect_code,
+            )
+            content = CareJourneyContent.model_validate(drafted)
     try:
-        result = CareJourneyService(session).intake(body)
+        result = CareJourneyService(session).intake(body, content, generated)
     except JourneyConflict as exc:
         return error_response(exc)
     if not result.created:
@@ -124,9 +163,74 @@ def list_workspace_cases(session: SessionDep):
 @router.get("/workspace/cases/{case_id}")
 def workspace_case_detail(case_id: str, session: SessionDep):
     try:
-        return CareJourneyService(session).detail(case_id)
+        return _detail(CareJourneyService(session), case_id)
     except JourneyNotFound as exc:
         return error_response(exc)
+
+
+@router.get("/workspace/cases/{case_id}/files")
+def case_file(case_id: str, key: str, session: SessionDep, storage: StorageDep):
+    """Stream a stored discharge PDF or medication image so the reviewer can see it."""
+    content = _case_bytes(case_id, key, storage) if session.get(CareJourney, case_id) else None
+    if content is None:
+        return JSONResponse(status_code=404, content={"error": "file_not_found"})
+    media_type = FILE_TYPES.get(PurePosixPath(key).suffix.lower(), "application/octet-stream")
+    return Response(content=content, media_type=media_type, headers={"Cache-Control": "no-store"})
+
+
+@router.post("/workspace/cases/{case_id}/draft")
+def regenerate_draft(case_id: str, session: SessionDep, storage: StorageDep, drafter: DrafterDep):
+    """Redraft the voice note, reminders and call scripts from the PDF and current medicines."""
+    journey = session.get(CareJourney, case_id)
+    pdf = _case_bytes(case_id, journey.source_document["objectKey"], storage) if journey else None
+    if journey is None:
+        return error_response(JourneyNotFound(case_id))
+    extraction = parse_discharge_pdf(pdf) if pdf else None
+    if extraction is None or extraction.status != "parsed":
+        return JSONResponse(status_code=409, content={"error": "document_not_readable"})
+    service = CareJourneyService(session)
+    try:
+        service.regenerate(case_id, extraction, drafter)
+        return _detail(service, case_id)
+    except (JourneyNotFound, JourneyConflict) as exc:
+        return error_response(exc)
+
+
+@router.post("/workspace/cases/{case_id}/eligibility")
+def check_eligibility(case_id: str, body: EligibilityRequest, session: SessionDep):
+    service = CareJourneyService(session)
+    try:
+        service.check_eligibility(case_id, body.member_id)
+        return _detail(service, case_id)
+    except (JourneyNotFound, JourneyConflict) as exc:
+        return error_response(exc)
+
+
+@router.get("/workspace/cases/{case_id}/extraction")
+def case_extraction(case_id: str, session: SessionDep, storage: StorageDep):
+    """Show the insurer what was read from the discharge PDF, next to the draft."""
+    journey = session.get(CareJourney, case_id)
+    key = journey.source_document["objectKey"] if journey else ""
+    content = _case_bytes(case_id, key, storage) if journey else None
+    if content is None:
+        return JSONResponse(status_code=404, content={"error": "file_not_found"})
+    return parse_discharge_pdf(content).to_api()
+
+
+def _detail(service: CareJourneyService, case_id: str) -> dict:
+    # In mock mode the worker marks runs sent without contacting WhatsApp or the caller.
+    return {**service.detail(case_id), "deliveryMode": get_settings().demo_provider_mode}
+
+
+def _case_bytes(case_id: str, key: str, storage) -> bytes | None:
+    """Read a stored object only when it belongs to this case."""
+    path = PurePosixPath(key)
+    if not key.startswith(f"cases/{case_id}/") or ".." in path.parts:
+        return None
+    try:
+        return storage.get_bytes(key)
+    except ObjectStorageError:
+        return None
 
 
 @router.patch("/workspace/cases/{case_id}/content")
@@ -154,6 +258,7 @@ def approve_workspace_case(
     return {
         "caseId": case_id,
         "reviewStatus": journey["reviewStatus"],
+        "insurance": journey["insurance"],
         "deliveryRuns": [service.run_view(run) for run in runs],
     }
 
@@ -161,6 +266,15 @@ def approve_workspace_case(
 @router.get("/workspace/alerts")
 def workspace_alerts(session: SessionDep):
     return {"data": CareJourneyService(session).alerts()}
+
+
+@router.post("/workspace/alerts/{alert_id}/resolve")
+def resolve_workspace_alert(alert_id: str, session: SessionDep):
+    try:
+        alert = CareJourneyService(session).resolve_alert(alert_id)
+    except JourneyNotFound:
+        return JSONResponse(status_code=404, content={"error": "alert_not_found"})
+    return {"id": alert.id, "status": alert.status}
 
 
 @router.get("/caregiver/cases/{case_id}")

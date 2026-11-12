@@ -67,3 +67,10 @@ def test_session_cannot_access_service_only_routes(client):
     response = client.get("/internal/review-events", headers=admin)
 
     assert response.status_code == 403
+
+
+def test_only_insurer_and_admin_can_resolve_alerts(client):
+    for role, expected in (("insurer", 404), ("admin", 404), ("caregiver", 403), ("hospital", 403)):
+        headers = session_headers(login(client, role))
+        response = client.post("/internal/workspace/alerts/missing/resolve", headers=headers)
+        assert response.status_code == expected, role

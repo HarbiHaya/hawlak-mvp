@@ -6,6 +6,8 @@ from pydantic.alias_generators import to_camel
 
 from app.dialects import DialectCode
 
+MEMBER_ID = r"^[A-Za-z0-9-]{4,32}$"
+
 
 class CamelModel(BaseModel):
     model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True, extra="forbid")
@@ -16,9 +18,10 @@ class SourceDocument(CamelModel):
     filename: str = Field(min_length=1, max_length=255)
 
 
+# Draft content may be incomplete. CareJourneyService.approve enforces completeness.
 class DischargeVoiceNote(CamelModel):
     enabled: bool = True
-    script: str = Field(min_length=1, max_length=6000)
+    script: str = Field(max_length=6000)
 
 
 class MedicationImage(CamelModel):
@@ -30,12 +33,12 @@ class MedicationImage(CamelModel):
 
 class JourneyMedication(CamelModel):
     medication_id: str = Field(min_length=1, max_length=128)
-    display_name: str = Field(min_length=1, max_length=200)
-    dose_instruction: str = Field(min_length=1, max_length=500)
+    display_name: str = Field(max_length=200)
+    dose_instruction: str = Field(max_length=500)
     dispensed: bool
     image: MedicationImage | None = None
     reminder_enabled: bool
-    reminder_script: str = Field(min_length=1, max_length=1000)
+    reminder_script: str = Field(max_length=1000)
 
     @model_validator(mode="after")
     def validate_reminder(self):
@@ -46,18 +49,22 @@ class JourneyMedication(CamelModel):
 
 class CallQuestion(CamelModel):
     id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
-    prompt: str = Field(min_length=1, max_length=1000)
+    prompt: str = Field(max_length=1000)
 
 
 class CallPlan(CamelModel):
     enabled: bool
-    scheduled_after_hours: int = Field(ge=0, le=168)
-    opening_script: str = Field(min_length=1, max_length=2000)
-    questions: list[CallQuestion] = Field(min_length=1, max_length=12)
-    completion_script: str = Field(min_length=1, max_length=1000)
-    transfer_script: str = Field(min_length=1, max_length=1000)
-    transfer_target: str = Field(min_length=1, max_length=100)
-    responder_phone_e164: str = Field(pattern=r"^\+[1-9]\d{7,14}$")
+    # First call: an exact time when set, otherwise this many hours after approval.
+    scheduled_after_hours: int = Field(default=24, ge=0, le=168)
+    first_call_at: datetime | None = None
+    repeat: Literal["none", "daily", "every_2_days", "weekly"] = "none"
+    occurrences: int = Field(default=1, ge=1, le=14)
+    opening_script: str = Field(max_length=2000)
+    questions: list[CallQuestion] = Field(max_length=12)
+    completion_script: str = Field(max_length=1000)
+    transfer_script: str = Field(max_length=1000)
+    transfer_target: str = Field(max_length=100)
+    responder_phone_e164: str = Field(pattern=r"^(\+[1-9]\d{7,14})?$")
 
 
 class CareJourneyCreate(CamelModel):
@@ -65,6 +72,7 @@ class CareJourneyCreate(CamelModel):
     patient_name: str = Field(min_length=2, max_length=200)
     preferred_form_of_address: str | None = Field(default=None, max_length=200)
     phone_e164: str = Field(pattern=r"^\+[1-9]\d{7,14}$")
+    member_id: str | None = Field(default=None, pattern=MEMBER_ID)
     language_code: Literal["ar", "en"]
     dialect_code: DialectCode
     source_document: SourceDocument
@@ -75,8 +83,12 @@ class CareJourneyCreate(CamelModel):
 
 class CareJourneyContent(CamelModel):
     discharge_voice_note: DischargeVoiceNote
-    medications: list[JourneyMedication] = Field(min_length=1, max_length=20)
+    medications: list[JourneyMedication] = Field(max_length=20)
     call_plan: CallPlan
+
+
+class EligibilityRequest(CamelModel):
+    member_id: str = Field(pattern=MEMBER_ID)
 
 
 class ApprovalRequest(CamelModel):

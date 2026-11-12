@@ -281,4 +281,44 @@ describe("HawlakApi", () => {
     expect(JSON.parse(String(init?.body))).toEqual({ approvedBy: "SYN-REVIEWER" });
     expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("approve-1");
   });
+
+  it("reports FastAPI validation errors as one readable code", async () => {
+    const fetcher = vi.fn(async () =>
+      new Response(JSON.stringify({ detail: [{ loc: ["body"], msg: "bad" }] }), { status: 422 }),
+    );
+    const api = new HawlakApi("/api", "", fetcher);
+
+    await expect(api.listWorkspaceCases()).rejects.toMatchObject({ code: "validation_failed" });
+  });
+
+  it("downloads a case file so the reviewer can see it", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response("%PDF-1.4", { status: 200, headers: { "Content-Type": "application/pdf" } }),
+    );
+    const api = new HawlakApi("/api", "token", fetcher);
+
+    const blob = await api.getCaseFile("case-1", "cases/case-1/media/a.pdf");
+
+    expect(await blob.text()).toBe("%PDF-1.4");
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect(url).toBe("/api/internal/workspace/cases/case-1/files?key=cases%2Fcase-1%2Fmedia%2Fa.pdf");
+    expect(new Headers(init?.headers).get("Authorization")).toBe("Bearer token");
+  });
+
+  it("loads what was read from the discharge PDF", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({
+        status: "parsed", language: "en", text: "NEW MEDICINES", notes: [],
+        medications: [{ name: "Fictional medicine A", instruction: "5 mg" }],
+        stoppedMedications: [], sections: [],
+      }), { status: 200 }),
+    );
+    const api = new HawlakApi("/api", "", fetcher);
+
+    const extraction = await api.getCaseExtraction("case-1");
+
+    expect(extraction.medications[0]?.name).toBe("Fictional medicine A");
+    expect(fetcher.mock.calls[0]?.[0]).toBe("/api/internal/workspace/cases/case-1/extraction");
+  });
 });
+

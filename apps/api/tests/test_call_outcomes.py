@@ -7,6 +7,7 @@ def approved_runs(client, internal_auth_headers, case_id: str = "case_call_outco
         "patientName": "سارة أحمد التجريبية",
         "preferredFormOfAddress": "أم أحمد",
         "phoneE164": "+966500000000",
+        "memberId": "SYN-4471203",
         "languageCode": "ar",
         "dialectCode": "ar-SA-najdi",
         "sourceDocument": {

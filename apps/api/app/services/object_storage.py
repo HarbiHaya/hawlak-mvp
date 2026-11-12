@@ -48,13 +48,23 @@ class ObjectStorage:
     ) -> None:
         self.bucket = settings.s3_bucket
         self._object_id_factory = object_id_factory or (lambda: str(uuid4()))
+        keys = (
+            {
+                "aws_access_key_id": settings.s3_access_key,
+                "aws_secret_access_key": settings.s3_secret_key.get_secret_value(),
+            }
+            if settings.s3_access_key and settings.s3_secret_key
+            else {}  # AWS: use the instance role through the default credential chain
+        )
         self._client = client or boto3.client(
             "s3",
             endpoint_url=settings.s3_endpoint,
             region_name=settings.s3_region,
-            aws_access_key_id=settings.s3_access_key,
-            aws_secret_access_key=settings.s3_secret_key.get_secret_value(),
-            config=Config(signature_version="s3v4", s3={"addressing_style": "path"}),
+            config=Config(
+                signature_version="s3v4",
+                s3={"addressing_style": "path" if settings.s3_endpoint else "virtual"},
+            ),
+            **keys,
         )
 
     def ensure_bucket(self) -> None:

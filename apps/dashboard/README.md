@@ -13,9 +13,8 @@ npm install
 npm run dev -w apps/dashboard
 ```
 
-Open <http://localhost:5173>. In local development, paste `INTERNAL_API_TOKEN`
-when prompted. The token stays in React memory. The hosted dashboard uses the
-same-origin `/api` proxy, which adds the token on the server.
+Open <http://localhost:5173> and sign in with a demo role account (`admin`,
+`hospital`, `insurer` or `caregiver`) and `DEMO_LOGIN_PASSWORD` from `.env`.
 
 ## Role workspaces
 

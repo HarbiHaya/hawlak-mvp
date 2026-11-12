@@ -3,18 +3,46 @@
 Notes for coding agents (Claude Code, Codex, Cursor) working in this repo.
 People should start with [README.md](README.md).
 
-Hawlak turns a clinician-approved discharge plan into an Arabic voice note in
-the patient's dialect, sends it on WhatsApp, collects medicine-box photos and
-creates a pharmacist-review event. The AI changes wording and dialect only.
+Hawlak turns a hospital discharge PDF into an insurer-approved follow-up
+journey. The journey has four parts:
+
+- one WhatsApp voice note in the patient's Saudi dialect
+- a reminder for each medicine
+- scheduled follow-up calls
+- a limited caregiver view
+
+The hospital uploads the PDF and the member ID. Hawlak drafts the content and
+checks eligibility. The insurer reviews, edits, schedules and approves, and a
+worker then delivers. The AI changes wording and dialect only.
+
+The current state, what is done and what is planned are in
+[README.md → Status](README.md#status-12-november-2026). Update that section
+when you finish a milestone.
 
 ## Who owns what
 
 | Path | Owner | Stack |
 |---|---|---|
 | `apps/api` | Haya | Python 3.12, FastAPI, SQLAlchemy, Alembic, uv |
-| `apps/dashboard` | Retaj | React + TypeScript, Vite |
+| `apps/dashboard` | Retaj | React 19 + TypeScript, Vite |
+| `apps/agent` | Haya | Python, LiveKit worker + control server (:3100) |
+| `deploy/aws`, `docker-compose.aws.yml` | Haya | EC2 + Docker Compose, CloudFront, S3, SSM |
 | `packages/contracts`, `docs/integration-contract.md` | both | Zod |
 | `docs/design-system` | both | Tokens and screen references for UI work |
+
+## Where things live
+
+| Concern | File |
+|---|---|
+| Intake, approval and scheduling rules | `apps/api/app/services/care_journey_service.py` |
+| PDF parsing | `apps/api/app/services/discharge_parser.py` |
+| Drafting and the fidelity guard | `apps/api/app/services/journey_drafter.py` |
+| Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v2.txt` |
+| Mock insurer eligibility and enrollment | `apps/api/app/services/insurer_systems.py` |
+| Meta and call dispatch | `apps/api/app/services/journey_delivery.py` |
+| Role APIs | `apps/api/app/routes/care_journeys.py` |
+| Insurer, hospital and caregiver UI | `apps/dashboard/src/*Workspace.tsx` |
+| Browser/API contract | `apps/dashboard/src/api.ts` |
 
 Stay inside the app you were asked to change. Changes to the contract need a
 pull request reviewed by both Haya and Retaj.
@@ -29,8 +57,16 @@ pull request reviewed by both Haya and Retaj.
 - Medicine photos are stored, never interpreted.
 - `apps/api` holds no UI code. `apps/dashboard` holds no AI, WhatsApp, database
   or storage code; it only calls the API.
+- Generated drafts must pass `guard_draft`, which checks numbers, medicine names
+  and doses. A draft that fails falls back to the template. Change the prompt by
+  adding a new versioned file, not by editing the old one in place.
+- Mock delivery must look like mock delivery. Runs with a `mock:` provider
+  reference show "Simulated — not actually sent". Never show them as sent.
+- Do not hard-code provider values, phone numbers, patient data or scripts.
 - Write the test first. Work is done when the checks below pass.
 - Branches: `haya/<feature>` or `retaj/<feature>`. `main` stays demo-ready.
+- Commit as the human author only, with no AI co-author or attribution lines.
+  Push only when asked.
 
 ## Commands
 
@@ -45,8 +81,30 @@ From the repo root:
 | API tests | `uv run --directory apps/api pytest` |
 | API lint | `uv run --directory apps/api ruff check . && uv run --directory apps/api ruff format --check .` |
 | Keyless demo | `uv run --directory apps/api python -m scripts.demo --mock --case abu-mohammed` |
+| Delivery worker | `npm run dev:worker` |
+| DB migrations | `uv run --directory apps/api alembic upgrade head` (needs `DATABASE_URL` from `.env`) |
+| AWS release | `deploy/aws/deploy.sh` |
+| Provider keys to AWS | `deploy/aws/sync_keys.sh --check`, then `deploy/aws/sync_keys.sh` |
 
-Tests use mocks; no provider keys are needed. Keep `DEMO_PROVIDER_MODE=mock`.
+Tests use mocks; no provider keys are needed. Keep `DEMO_PROVIDER_MODE=mock`
+locally.
+
+The repo is synced by iCloud. Keep the Python venv outside it:
+`export UV_PROJECT_ENVIRONMENT="$HOME/.cache/hawlak-api-venv"`. iCloud also
+creates `* 2` duplicate files and folders. Never commit them. Delete them from
+`node_modules` when a typecheck fails strangely.
+
+## AWS demo
+
+- The demo uses AWS profile `hawlak` in eu-north-1 only.
+- There is no SSH. Use Session Manager.
+- Secrets live in the SSM SecureString `/hawlak/demo/env`. Never print them.
+- Never type the demo password or provider keys into the hosted site. People
+  paste keys into their local `.env` themselves.
+- The stack stays running unless Haya asks for cleanup.
+- WhatsApp sends free-form messages only within 24 hours of the patient's last
+  message. Until templates exist, the patient must message the business number
+  first.
 
 <!-- BEGIN AWS Agent Toolkit rules -->
 # AWS Guidance for the new AWS experience
@@ -97,6 +155,8 @@ Skip it only for work that does not involve AWS.
 - help_level (required): LOW, MEDIUM, or HIGH. While a user is building, you MUST ask the user: "How much guidance would you like from me? Low (I only flag security risks), medium (I ask a couple of clarifying questions if something seems off), or high (I explain what I'm doing, suggest alternatives, and flag best practices)."
 
 You CAN update this rule file to save a user's help_level.
+
+Saved help_level for this project: **MEDIUM** (chosen by Haya, 12 November 2026).
 
 Constraints for each level:
 

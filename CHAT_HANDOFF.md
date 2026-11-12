@@ -40,7 +40,8 @@ The Medathon demo uses:
 - Telnyx voice and SIP transfer
 - ElevenLabs text-to-speech
 - an OpenAI-compatible speech and classification interface
-- one Google Compute Engine VM with Docker Compose
+- one AWS EC2 instance (eu-north-1) with Docker Compose behind CloudFront, files in S3,
+  secrets in SSM (`deploy/aws/`); live since 12 November 2026 in mock mode
 
 The Saudi production profile replaces external speech and call processing with
 Saudi-hosted models and contracted local carriers such as stc or Zain. Do not
@@ -80,7 +81,9 @@ scripts become immutable after insurer approval.
 Start with these files:
 
 - `README.md` — repository entry point
-- `docker-compose.demo.yml` — hosted demo services
+- `docker-compose.aws.yml`, `deploy/aws/README.md` — hosted AWS demo and going live
+- `apps/api/app/services/journey_drafter.py` — drafts plus fidelity guard (prompt v2)
+- `apps/api/app/services/insurer_systems.py` — mock eligibility and enrollment
 - `docs/setup/live-demo-stack.md` — manual provider and hosting setup
 - `scripts/setup_live_demo.sh` — interactive credential setup wizard
 - `apps/dashboard/src/HospitalWorkspace.tsx` — hospital workflow
@@ -98,9 +101,9 @@ Start with these files:
 
 The following checks pass:
 
-- API: Ruff and 164 tests
+- API: Ruff and 209 tests
 - call agent: Ruff and 19 tests
-- dashboard: TypeScript, 9 tests, and production build
+- dashboard: TypeScript, 18 tests, and production build
 - shared contracts: TypeScript, 3 tests, and production build
 - Docker images: API, dashboard, and agent build successfully
 - container smoke tests: API import, agent app creation, and Nginx config
@@ -132,14 +135,19 @@ docker compose --env-file .env.example -f docker-compose.demo.yml config --quiet
 - Create the LiveKit project and the Telnyx SIP trunk. Test both the outbound
   call and SIP transfer.
 - Select and test the Arabic voice and speech-to-text model.
-- Create the GCP VM, DNS record, and HTTPS deployment.
+- Put the provider keys in the local `.env` and run `deploy/aws/sync_keys.sh` (AWS hosting
+  already exists). The Meta business "Hawlak" still needs a production number, payment
+  method and a published app.
 - Run one rehearsal with synthetic data only.
 - Confirm that the test recipient sends `START` before WhatsApp dispatch.
 
 ## Known proof-of-concept limits
 
-- The PDF is stored privately, but automated extraction from arbitrary discharge
-  PDFs is not complete. The insurer can enter and approve the structured content.
+- The discharge PDF is parsed with `pypdf` (`apps/api/app/services/discharge_parser.py`)
+  and pre-fills the insurer draft: medications, plus the voice-note text when the
+  document and patient languages match. Parsing is deterministic and heading-based;
+  scanned PDFs (no text layer) need manual entry until OCR is added. The insurer
+  still checks and approves every line.
 - The web role selector is a prototype. Production needs identity, organization,
   membership, and role-based authorization.
 - The caregiver view is web-only and uses a case identifier in the prototype.

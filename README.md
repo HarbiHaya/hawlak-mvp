@@ -9,6 +9,73 @@ patients or real clinical data. OpenAI may adapt wording and Saudi dialect only;
 it cannot add or change clinical facts. A human must approve the exact script
 before audio is generated or sent.
 
+## Status (12 November 2026)
+
+### The product today
+
+One bilingual (Arabic/English) web app with role-scoped demo login:
+
+1. **Hospital** uploads the discharge PDF and enters the patient label, test phone
+   number, language and dialect, and insurer member ID.
+2. **Hawlak** reads the PDF (`pypdf`) and drafts the WhatsApp voice note, one
+   reminder per medicine, and the call script. It also checks the member's
+   eligibility with the insurer system. The insurer system is simulated by
+   `MockInsurerSystems`.
+3. **Insurer** reviews the case in five tabs: source, coverage, content,
+   medications and journey. Each text shows whether it was generated or edited by
+   the reviewer, and the reviewer can regenerate drafts. The reviewer schedules
+   calls (24/48/72 hours, or an exact date and time; repeating daily, every 2 days
+   or weekly; up to 14 calls), then approves. Approval needs an eligible member,
+   records an enrollment reference and creates the delivery runs.
+4. **Delivery worker** sends due runs. In mock mode every run is labelled
+   "Simulated — not actually sent".
+5. **Caregiver** sees adherence state, the next call and open escalations only.
+
+Drafting uses a template, or OpenAI with prompt `journey-draft-v2` when live keys
+are set. Every OpenAI draft passes a fidelity guard: the same numbers as the
+source, exact medicine names, and every dose in the script. A draft that fails
+falls back to the template.
+
+The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compose)
+→ S3, with secrets in SSM. It is still in **mock mode**. See
+[`deploy/aws/README.md`](deploy/aws/README.md).
+
+### Done
+
+- Full hospital → insurer → caregiver flow, in English and Arabic, with formal
+  wording throughout.
+- PDF parser that drafts the medicine list, voice note, reminders and call
+  questions.
+- Mock insurer systems: eligibility (IDs ending `99` are not found; IDs ending
+  `00` have a lapsed policy) and enrollment references.
+- Call calendar with exact time, repeat pattern and number of calls.
+- Prompt v2 and the deterministic draft guard.
+- Honest delivery labels in mock mode.
+- AWS hosting with scripts:
+  - `provision.sh`
+  - `deploy.sh`
+  - `sync_keys.sh`, which pushes provider keys from `.env` to SSM and redeploys
+- Checks: API 209 tests, dashboard 18 tests, contracts 3 tests, typecheck and build.
+
+### Planned / next
+
+- **Live providers**:
+  - Meta WhatsApp production number on the Hawlak business. It has only a test
+    number today, the app is in development mode, and there is no payment method.
+  - OpenAI key.
+  - ElevenLabs Saudi Arabic voice.
+  - LiveKit project and Telnyx SIP trunk with +966 allowed and a tested transfer.
+  - Then run `deploy/aws/sync_keys.sh`.
+- WhatsApp message templates, so Hawlak can send outside the 24-hour window. Until
+  then, the patient must message the business number first.
+- Reconcile Retaj's pharmacist-review dashboard (on `main` from PR #1) with this
+  branch.
+- Contract review by Haya and Retaj of the new fields: `memberId`, `callPlan`
+  schedule, `insurance` and `generatedDraft`.
+- OCR for scanned PDFs, and a real insurer integration in place of the mock.
+- Before any real data: HTTPS from CloudFront to the origin, production identity
+  and roles, and the PDPL work in ADR 0003.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -22,6 +89,7 @@ before audio is generated or sent.
 | `docs/live-demo-runbook.md` | Controlled phone rehearsal |
 | `docs/setup` | WhatsApp provider setup |
 | `docs/design-system` | Brand tokens and screen references for the dashboard |
+| `deploy/aws`, `docker-compose.aws.yml` | AWS demo hosting (CloudFront, EC2, S3, SSM) |
 
 The backend owns OpenAI, ElevenLabs, WhatsApp, webhooks and media storage. The
 dashboard calls authenticated backend routes and never receives provider or
@@ -48,6 +116,7 @@ docker compose up -d postgres minio minio-init
 npm ci
 npm run dev:api
 npm run dev -w apps/dashboard
+npm run dev:worker   # sends approved journey steps (mock mode: no real messages)
 ```
 
 Fill `.env` with local credentials before using live providers. Keep
@@ -107,10 +176,10 @@ controlled live test-number rehearsal, follow
 ## Complete role-based prototype
 
 The dashboard is implemented in [`apps/dashboard`](apps/dashboard/README.md).
-The hospital uploads a synthetic discharge PDF and selects the patient language.
-The insurer reviews extracted content, chooses service eligibility, edits and
-approves the exact voice and call scripts, approves medication images, and
-dispatches the journey. The caregiver sees only adherence state and required
+The hospital uploads a synthetic discharge PDF, the patient language and the
+insurer member ID. The insurer reviews the generated drafts against the source,
+confirms coverage, edits and approves the exact voice and call scripts,
+schedules the calls, and approves the journey. The caregiver sees only adherence state and required
 action. The patient remains in WhatsApp and telephone channels and does not need
 to open Hawlak or follow a link.
 
@@ -138,10 +207,8 @@ the WhatsApp session constraint, follow
 
 The architecture source and rendered SVG are in `docs/architecture/`.
 
-The next live-delivery milestone is defined in
-[`../26_hawlak_live_phone_delivery_implementation.md`](../26_hawlak_live_phone_delivery_implementation.md):
-an authorized tester enters a number in the dashboard, receives a real WhatsApp
-voice note, and receives a LiveKit-powered conversational telephone call. The
-external demo provider profile is intentionally separate from the Saudi-hosted
+The next milestone is live delivery: an authorized tester enters a number in the
+dashboard, receives a real WhatsApp voice note, and then receives a
+LiveKit-powered conversational telephone call. The external demo provider profile is intentionally separate from the Saudi-hosted
 production provider profile recorded in
 [`docs/adr/0003-separate-demo-and-saudi-production-provider-profiles.md`](docs/adr/0003-separate-demo-and-saudi-production-provider-profiles.md).

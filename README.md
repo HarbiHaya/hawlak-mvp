@@ -73,8 +73,17 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
 - Contract review by Haya and Retaj of the new fields: `memberId`, `callPlan`
   schedule, `insurance` and `generatedDraft`.
 - OCR for scanned PDFs, and a real insurer integration in place of the mock.
-- Before any real data: HTTPS from CloudFront to the origin, production identity
-  and roles, and the PDPL work in ADR 0003.
+- Before any real data:
+  - HTTPS from CloudFront to the origin.
+  - Production identity and roles.
+  - A patient-message PII gate: no full name, member ID or phone number in
+    patient-facing text, and a generic greeting as the fallback.
+  - The PDPL work in ADR 0003.
+- Show the patient's `taken`/`not_yet` replies in the caregiver view. Hawlak
+  records the replies today, but the caregiver view doesn't show them.
+- The data flow, privacy boundary, threat model and status of each component are
+  in
+  [`docs/architecture/platform-data-privacy.md`](docs/architecture/platform-data-privacy.md).
 
 ## Repository layout
 
@@ -206,6 +215,9 @@ the WhatsApp session constraint, follow
 - Preserve exact-script human approval and deterministic clinical-fact checks.
 
 The architecture source and rendered SVG are in `docs/architecture/`.
+The current platform data flow, privacy boundary, threat summary, Saudi-hosted
+alternative, and evidence-based component status are in
+[`docs/architecture/platform-data-privacy.md`](docs/architecture/platform-data-privacy.md).
 
 The next milestone is live delivery: an authorized tester enters a number in the
 dashboard, receives a real WhatsApp voice note, and then receives a

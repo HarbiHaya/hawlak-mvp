@@ -43,6 +43,10 @@ when you finish a milestone.
 | Role APIs | `apps/api/app/routes/care_journeys.py` |
 | Insurer, hospital and caregiver UI | `apps/dashboard/src/*Workspace.tsx` |
 | Browser/API contract | `apps/dashboard/src/api.ts` |
+| Data flow, privacy boundary, threat model | `docs/architecture/platform-data-privacy.md` |
+
+Read the privacy doc before changing what data leaves Hawlak, and update its
+status table when you change it.
 
 Stay inside the app you were asked to change. Changes to the contract need a
 pull request reviewed by both Haya and Retaj.

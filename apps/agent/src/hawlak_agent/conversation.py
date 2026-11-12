@@ -83,6 +83,7 @@ class CallAction(BaseModel):
     kind: CallActionKind
     spoken_text: str
     question_id: str | None = None
+    answer_kind: AnswerKind | None = None
     transfer_to: str | None = None
 
 
@@ -125,9 +126,12 @@ class CallConversation:
             raise RuntimeError("no approved question is awaiting an answer")
         if answer is not AnswerKind.CLEAR:
             self._finished = True
+            question = self._plan.questions[self._question_index]
             return CallAction(
                 kind=CallActionKind.TRANSFER,
                 spoken_text=self._plan.transfer_script,
+                question_id=question.id,
+                answer_kind=answer,
                 transfer_to=self._plan.responder_phone_e164,
             )
         return self.next_question()

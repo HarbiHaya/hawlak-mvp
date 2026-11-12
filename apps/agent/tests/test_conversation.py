@@ -56,6 +56,8 @@ def test_red_flag_uncertainty_and_request_all_transfer() -> None:
         assert action.kind is CallActionKind.TRANSFER
         assert action.spoken_text == plan().transfer_script
         assert action.transfer_to == plan().responder_phone_e164
+        assert action.question_id == "general"
+        assert action.answer_kind is answer
 
 
 def test_conversation_rejects_unapproved_or_incomplete_plan() -> None:

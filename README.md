@@ -50,12 +50,18 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
   `00` have a lapsed policy) and enrollment references.
 - Call calendar with exact time, repeat pattern and number of calls.
 - Prompt v2 and the deterministic draft guard.
+- PII gate. Approval is blocked when patient-facing text contains:
+  - the full name or the phone number;
+  - a national or Iqama number;
+  - the member or policy number;
+  - the case ID or the source filename.
+  Drafts greet without a name unless a form of address is approved.
 - Honest delivery labels in mock mode.
 - AWS hosting with scripts:
   - `provision.sh`
   - `deploy.sh`
   - `sync_keys.sh`, which pushes provider keys from `.env` to SSM and redeploys
-- Checks: API 209 tests, dashboard 18 tests, contracts 3 tests, typecheck and build.
+- Checks: API 218 tests, dashboard 18 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 
@@ -76,8 +82,7 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
 - Before any real data:
   - HTTPS from CloudFront to the origin.
   - Production identity and roles.
-  - A patient-message PII gate: no full name, member ID or phone number in
-    patient-facing text, and a generic greeting as the fallback.
+  - The registered name removed from the caregiver view.
   - The PDPL work in ADR 0003.
 - Show the patient's `taken`/`not_yet` replies in the caregiver view. Hawlak
   records the replies today, but the caregiver view doesn't show them.

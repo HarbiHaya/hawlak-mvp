@@ -37,6 +37,7 @@ export function displayError(error: unknown, locale: Locale): string {
     voice_script_required: { ar: "يُرجى إدخال نص الرسالة الصوتية أو إيقاف إرسالها.", en: "Enter the voice message text or turn the voice message off." },
     call_plan_incomplete: { ar: "يُرجى استكمال نصوص مكالمة المتابعة ورقم فريق الاستجابة، أو إيقاف المكالمة.", en: "Complete the follow-up call scripts and the responder number, or turn the call off." },
     call_time_in_past: { ar: "موعد المكالمة الأولى في الماضي. يُرجى اختيار موعد لاحق.", en: "The first call is scheduled in the past. Select a later time." },
+    patient_text_contains_identifier: { ar: "يحتوي نص موجّه للمريض على بيانات تعريفية (الاسم الكامل أو رقم الجوال أو رقم الهوية أو الإقامة أو رقم العضوية أو الوثيقة أو رقم الحالة أو اسم الملف). يُرجى حذفها قبل الاعتماد.", en: "Patient-facing text contains an identifier (full name, phone number, national or Iqama number, member or policy number, case ID or file name). Remove it before approval." },
     no_channel_enabled: { ar: "يجب تفعيل قناة تواصل واحدة على الأقل: الرسالة الصوتية أو تذكير الدواء أو مكالمة المتابعة.", en: "Enable at least one channel: voice message, medication reminder or follow-up call." },
     document_not_readable: { ar: "تعذّرت قراءة نص ملخص الخروج، لذا لا يمكن إنشاء المسودات تلقائياً.", en: "The discharge summary text could not be read, so drafts cannot be generated automatically." },
     case_not_found: { ar: "لم يُعثر على الحالة. يُرجى التحقق من رقم الحالة.", en: "No case was found. Check the case reference." },

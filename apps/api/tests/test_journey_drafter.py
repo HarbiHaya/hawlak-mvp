@@ -72,3 +72,32 @@ def test_live_drafter_falls_back_to_the_template_when_the_model_invents_a_dose(e
 
     assert draft.generator == "template"
     assert "5 mg" in draft.voice_script
+
+
+def test_template_greets_without_a_name_when_no_form_of_address_is_approved(extraction):
+    english = TemplateJourneyDrafter().draft(extraction, MEDICATIONS, None, "en")
+    arabic = TemplateJourneyDrafter().draft(extraction, MEDICATIONS, None, "ar")
+
+    assert english.voice_script.startswith("Hello. This message from Hawlak")
+    assert english.call_opening.startswith("Hello. This is Hawlak")
+    assert arabic.voice_script.startswith("السلام عليكم. هذه رسالة من حولك")
+
+
+def test_live_drafter_never_sends_identifying_notes_to_the_model(extraction):
+    seen = {}
+
+    class Model:
+        def generate(self, prompt, payload):
+            seen.update(payload)
+            raise RuntimeError("stop after capturing the payload")
+
+    extraction.notes = [
+        "Patient name: Synthetic Patient",
+        "MRN: 55120",
+        "رقم الهوية: 1098765432",
+        "Emergency number: 997",
+    ]
+    LiveJourneyDrafter(Model(), "test-model").draft(extraction, MEDICATIONS, None, "en")
+
+    assert seen["notes"] == ["Emergency number: 997"]
+    assert seen["patientLabel"] is None

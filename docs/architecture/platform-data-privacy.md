@@ -88,14 +88,33 @@ not fall back to the registered full name. Examples of safe display values are:
 The phone number still has to go to the selected messaging or telephone provider
 for routing. Masking the user interface does not remove that provider disclosure.
 
-### Current gap
+### Implemented gate and remaining gap
 
-The current drafter uses `preferredFormOfAddress` when present and otherwise
-falls back to `patientName`. The current caregiver projection also returns
-`patientName`. The repository does not have a patient-message PII scanner that
-rejects a full name, member ID, national ID, case ID, or phone number. As a
-result, the no-full-name rule is **planned and must be implemented before a real
-pilot**.
+**Implemented (12 November 2026):** `find_identifier` in
+`apps/api/app/services/patient_identifiers.py` checks every text that approval
+will send: the voice note, the active reminders, and the call scripts and
+questions. Approval fails with `patient_text_contains_identifier` if any of them
+contains one of these:
+
+- the registered full name (two or more words);
+- the patient's phone number, in Western or Arabic digits and with any separators;
+- a 10-digit Saudi national or Iqama number;
+- the member or policy number;
+- the case ID; or
+- the source filename.
+
+The drafter no longer falls back to `patientName`. It greets with no name unless
+a preferred form of address was approved. The call service receives
+`participantLabel = "patient"` instead of the registered name. The live drafting
+payload drops `label: value` notes that name or number the patient, but keeps
+emergency numbers.
+
+**Remaining gap:**
+
+- The caregiver projection still returns `patientName`.
+- The gate catches only identifiers Hawlak knows about, plus the Saudi ID
+  pattern. Another person's name, or an unknown record number, still depends on
+  human review.
 
 ### Minimum data by boundary
 
@@ -165,7 +184,7 @@ Official background sources:
 | Threat | Existing MVP control | Remaining gap |
 |---|---|---|
 | An unauthorized user views a clinical case | Demo login tokens and route-level hospital, insurer, caregiver, and admin checks | Production identity, organization membership, clinical-role separation, MFA, session controls, and periodic access review are planned |
-| A full identifier enters patient-facing content | Human review before approval | An automatic PII rejection gate and a generic-greeting fallback are planned |
+| A full identifier enters patient-facing content | Human review, plus an automatic gate that blocks approval when known identifiers or a Saudi ID pattern appear; generic greeting when no approved form of address exists | Unknown names or record numbers still depend on human review |
 | A draft changes a clinical fact | Number, medicine-name, and dose fidelity guard; exact human approval; approved content becomes immutable | Clinical validation for all free-text facts and source-version change control need pilot governance |
 | A forged WhatsApp webhook changes state | Meta `X-Hub-Signature-256` verification | Live configuration and key rotation are unverified |
 | A provider retries the same event | Idempotency keys and unique message or workflow-event records | Cross-provider reconciliation and operational replay tooling need live testing |
@@ -244,7 +263,8 @@ residency design.
 | LiveKit and Telnyx call agent | **In progress** | Deterministic code and tests exist; live route and transfer are not proven |
 | Red-flag call outcome and alert | **Implemented** | Minimal outcome, workflow event, and alert creation exist in code |
 | Real staffed red-flag response | **Unverified** | Responder ownership, hours, and service levels are not confirmed |
-| Patient-facing PII rejection and masking | **Planned** | Human review exists, but the code can fall back to the registered name |
+| Patient-facing PII rejection gate | **Implemented** | Blocks approval on known identifiers and Saudi ID pattern; no registered-name fallback |
+| Caregiver label minimization | **Planned** | Caregiver projection still returns the registered name |
 | Production caregiver consent and access | **Planned** | Case-reference lookup is a prototype only |
 | WhatsApp E2EE boundary for Hawlak Cloud API | **Unverified** | Treat as an assumption until current account and contract review |
 | Saudi data residency | **Unverified** | Current demo is outside Saudi Arabia |

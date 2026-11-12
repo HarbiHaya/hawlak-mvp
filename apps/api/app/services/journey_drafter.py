@@ -18,15 +18,21 @@ from app.dialects import get_dialect_profile
 from app.services.discharge_parser import DischargeExtraction
 
 logger = logging.getLogger(__name__)
-PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "journey-draft-v2.txt"
+PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "journey-draft-v3.txt"
 WARNING_HEADINGS = ("warning", "red flag", "علامات الخطر", "علامات التحذير")
 ARABIC_HEADINGS = {"activity": "النشاط", "diet": "الغذاء", "follow": "المتابعة"}
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
+_IDENTIFYING_LABEL = re.compile(
+    r"name|\bid\b|mrn|record|phone|mobile|member|policy|national|iqama|"
+    r"اسم|هوية|إقامة|اقامة|ملف|جوال|هاتف|عضوية|وثيقة",
+    re.IGNORECASE,
+)
+_EMERGENCY = re.compile(r"emergency|طوارئ|إسعاف|اسعاف", re.IGNORECASE)
 
 TEXT = {
     "en": {
-        "greeting": "Hello {label}. This message from Hawlak, on behalf of your care team, "
+        "greeting": "Hello{label}. This message from Hawlak, on behalf of your care team, "
         "summarises your discharge instructions.",
         "medicines": "Your medicines:",
         "stopped": "Stop taking: {items}.",
@@ -35,7 +41,7 @@ TEXT = {
         "at once: {items}.",
         "closing": "Please keep this message for reference.",
         "reminder": "Hawlak reminder: it is time to take {name}. {instruction}",
-        "opening": "Hello {label}. This is Hawlak, calling on behalf of your care team to follow "
+        "opening": "Hello{label}. This is Hawlak, calling on behalf of your care team to follow "
         "up on your recovery after discharge. I will ask a few short questions. "
         "Please answer yes or no.",
         "question": "Since leaving the hospital, have you had {item}?",
@@ -46,7 +52,7 @@ TEXT = {
         "list": "; ",
     },
     "ar": {
-        "greeting": "السلام عليكم {label}. هذه رسالة من حولك نيابةً عن فريق رعايتك، "
+        "greeting": "السلام عليكم{label}. هذه رسالة من حولك نيابةً عن فريق رعايتك، "
         "وتتضمن تعليمات الخروج من المستشفى.",
         "medicines": "أدويتك:",
         "stopped": "يُرجى التوقف عن تناول: {items}.",
@@ -54,7 +60,7 @@ TEXT = {
         "warning_no_number": "إذا لاحظت أياً مما يلي فاطلب الرعاية الطبية العاجلة فوراً: {items}.",
         "closing": "يُرجى الاحتفاظ بهذه الرسالة للرجوع إليها.",
         "reminder": "تذكير من حولك: حان موعد تناول {name}. {instruction}",
-        "opening": "السلام عليكم {label}. معك حولك نيابةً عن فريق رعايتك لمتابعة حالتك بعد "
+        "opening": "السلام عليكم{label}. معك حولك نيابةً عن فريق رعايتك لمتابعة حالتك بعد "
         "الخروج من المستشفى. سأطرح عليك أسئلة قصيرة، يُرجى الإجابة بنعم أو لا.",
         "question": "منذ خروجك من المستشفى، هل لاحظت: {item}؟",
         "completion": "شكراً لك. سُجّلت إجاباتك وأُبلغ بها فريق رعايتك. مع السلامة.",
@@ -93,16 +99,17 @@ class TemplateJourneyDrafter:
         self,
         extraction: DischargeExtraction,
         medications: list[dict],
-        label: str,
+        label: str | None,
         language: str,
         dialect_code: str | None = None,
     ) -> JourneyDraft:
+        greeting = f" {label}" if label else ""  # no approved form of address: no name
         text = TEXT["ar" if language == "ar" else "en"]
         warnings = [s for s in extraction.sections if _is_warning(s.heading)]
         others = [s for s in extraction.sections if not _is_warning(s.heading)]
         number = _emergency_number(extraction)
 
-        lines = [text["greeting"].format(label=label)]
+        lines = [text["greeting"].format(label=greeting)]
         if medications:
             lines.append(text["medicines"])
             lines += [_sentence(f"{m['displayName']}: {m['doseInstruction']}") for m in medications]
@@ -127,7 +134,7 @@ class TemplateJourneyDrafter:
                 .strip()
                 for m in medications
             },
-            call_opening=text["opening"].format(label=label),
+            call_opening=text["opening"].format(label=greeting),
             call_questions=[
                 {
                     "id": f"warning-{index}",
@@ -163,7 +170,7 @@ class LiveJourneyDrafter:
             ],
             "stoppedMedications": extraction.stopped_medications,
             "sections": [{"heading": s.heading, "items": s.items} for s in extraction.sections],
-            "notes": extraction.notes,
+            "notes": [note for note in extraction.notes if not _identifying(note)],
         }
         try:
             raw = self._model.generate(PROMPT_PATH.read_text(encoding="utf-8"), payload)
@@ -187,6 +194,12 @@ class LiveJourneyDrafter:
             fallback = self._fallback.draft(extraction, medications, label, language, dialect_code)
             fallback.notes.append("live_draft_rejected")
             return fallback
+
+
+def _identifying(note: str) -> bool:
+    """A "label: value" note that names or numbers the patient stays out of the model input."""
+    label = note.split(":", 1)[0]
+    return bool(_IDENTIFYING_LABEL.search(label)) and not _EMERGENCY.search(label)
 
 
 def guard_draft(draft: JourneyDraft, extraction: DischargeExtraction, medications: list) -> None:

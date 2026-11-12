@@ -678,3 +678,50 @@ def test_case_detail_says_when_delivery_is_only_simulated(client, internal_auth_
     detail = client.get("/internal/workspace/cases/case_poc_01", headers=internal_auth_headers)
 
     assert detail.json()["deliveryMode"] == "mock"
+
+
+def test_patient_text_with_a_personal_identifier_blocks_approval(client, internal_auth_headers):
+    cases = [
+        lambda b: b["dischargeVoiceNote"].update(script="السلام عليكم مريم خالد العتيبي."),
+        lambda b: b["medications"][0].update(reminderScript="رقمك ٠٥٠٠٠٠٠٠٠٠ مسجل لدينا."),
+        lambda b: b["callPlan"]["questions"][0].update(prompt="هل رقم هويتك 1098765432؟"),
+        lambda b: b["callPlan"].update(openingScript="Your member ID is SYN-4471203."),
+    ]
+    for index, mutate in enumerate(cases):
+        body = intake_body()
+        body["caseId"] = f"case_identifier_{index}"
+        mutate(body)
+        client.post("/internal/workspace/cases", json=body, headers=internal_auth_headers)
+
+        response = approve(client, internal_auth_headers, body["caseId"], f"identifier-{index}")
+
+        assert response.json() == {"error": "patient_text_contains_identifier"}, index
+
+
+def test_drafts_never_greet_the_patient_by_registered_name(
+    client, internal_auth_headers, fixtures_dir
+):
+    app.dependency_overrides[get_object_storage] = pdf_storage(fixtures_dir)
+    body = pdf_intake_body("en")
+    body.pop("preferredFormOfAddress")
+
+    client.post("/internal/workspace/cases", json=body, headers=internal_auth_headers)
+    detail = client.get(
+        "/internal/workspace/cases/case_poc_01", headers=internal_auth_headers
+    ).json()
+
+    assert detail["dischargeVoiceNote"]["script"].startswith("Hello. ")
+    assert body["patientName"] not in detail["dischargeVoiceNote"]["script"]
+    assert body["patientName"] not in detail["callPlan"]["openingScript"]
+
+
+def test_call_service_never_receives_the_registered_name(client, internal_auth_headers):
+    body = intake_body()
+    body.pop("preferredFormOfAddress")
+    client.post("/internal/workspace/cases", json=body, headers=internal_auth_headers)
+    runs = approve(client, internal_auth_headers, "case_poc_01", "no-name").json()["deliveryRuns"]
+    call_run = next(run for run in runs if run["kind"] == "follow_up_call")
+
+    plan = client.get(f"/internal/call-plans/{call_run['id']}", headers=internal_auth_headers)
+
+    assert plan.json()["participantLabel"] == "patient"

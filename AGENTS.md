@@ -37,7 +37,8 @@ when you finish a milestone.
 | Intake, approval and scheduling rules | `apps/api/app/services/care_journey_service.py` |
 | PDF parsing | `apps/api/app/services/discharge_parser.py` |
 | Drafting and the fidelity guard | `apps/api/app/services/journey_drafter.py` |
-| Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v2.txt` |
+| Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v3.txt` |
+| Patient-text identifier gate | `apps/api/app/services/patient_identifiers.py` |
 | Mock insurer eligibility and enrollment | `apps/api/app/services/insurer_systems.py` |
 | Meta and call dispatch | `apps/api/app/services/journey_delivery.py` |
 | Role APIs | `apps/api/app/routes/care_journeys.py` |
@@ -64,6 +65,10 @@ pull request reviewed by both Haya and Retaj.
 - Generated drafts must pass `guard_draft`, which checks numbers, medicine names
   and doses. A draft that fails falls back to the template. Change the prompt by
   adding a new versioned file, not by editing the old one in place.
+- Patient-facing text never carries the registered full name, a phone number, a
+  national or Iqama number, a member or policy number, the case ID or the
+  source filename. `find_identifier` blocks approval when it finds one. Never
+  fall back to `patientName` when no approved form of address exists.
 - Mock delivery must look like mock delivery. Runs with a `mock:` provider
   reference show "Simulated — not actually sent". Never show them as sent.
 - Do not hard-code provider values, phone numbers, patient data or scripts.

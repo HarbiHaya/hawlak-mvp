@@ -141,7 +141,7 @@ def create_workspace_case(
                 drafter,
                 medications=draft_medications(extraction),
                 call_plan=DEFAULT_CALL_PLAN,
-                label=body.preferred_form_of_address or body.patient_name,
+                label=body.preferred_form_of_address,
                 language=body.language_code,
                 dialect=body.dialect_code,
             )

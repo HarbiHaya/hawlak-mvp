@@ -13,6 +13,7 @@ from app.schemas.care_journey import (
 )
 from app.services.discharge_parser import DischargeExtraction, draft_medications
 from app.services.insurer_systems import MockInsurerSystems
+from app.services.patient_identifiers import find_identifier
 
 REPEAT_DAYS = {"none": 0, "daily": 1, "every_2_days": 2, "weekly": 7}
 
@@ -155,7 +156,7 @@ class CareJourneyService:
             drafter,
             medications=journey.medications or draft_medications(extraction),
             call_plan=journey.call_plan,
-            label=journey.preferred_form_of_address or patient.patient_alias,
+            label=journey.preferred_form_of_address,
             language=journey.language_code,
             dialect=patient.dialect_code,
         )
@@ -167,7 +168,7 @@ class CareJourneyService:
         return journey
 
     def approve(self, case_id: str, approved_by: str, idempotency_key: str) -> list[DeliveryRun]:
-        journey, _ = self._get(case_id)
+        journey, patient = self._get(case_id)
         if journey.review_status == "approved":
             if journey.approval_idempotency_key != idempotency_key:
                 raise JourneyConflict("already_approved")
@@ -181,6 +182,8 @@ class CareJourneyService:
         incomplete = self._first_incomplete_section(journey)
         if incomplete:
             raise JourneyConflict(incomplete)
+        if self._patient_identifier(journey, patient):
+            raise JourneyConflict("patient_text_contains_identifier")
 
         for medication in journey.medications:
             if not medication["dispensed"]:
@@ -245,7 +248,7 @@ class CareJourneyService:
             "version": 1,
             "approvedAt": journey.approved_at,
             "phoneE164": patient.phone_e164,
-            "participantLabel": journey.preferred_form_of_address or patient.patient_alias,
+            "participantLabel": journey.preferred_form_of_address or "patient",
             "language": journey.language_code,
             "dialectCode": patient.dialect_code,
             "scheduledAt": run.scheduled_at,
@@ -520,6 +523,30 @@ class CareJourneyService:
         return None
 
     @staticmethod
+    def _patient_identifier(journey: CareJourney, patient: PatientCase) -> str | None:
+        """Scan exactly what will be sent; the reviewer must remove any identifier found."""
+        voice, call = journey.discharge_voice_note, journey.call_plan
+        texts = [voice["script"]] if voice.get("enabled") else []
+        texts += [
+            m["reminderScript"]
+            for m in journey.medications
+            if m["dispensed"] and m["reminderEnabled"]
+        ]
+        if call.get("enabled"):
+            texts += [call[k] for k in ("openingScript", "completionScript", "transferScript")]
+            texts += [q["prompt"] for q in call["questions"]]
+        insurance = journey.insurance or {}
+        return find_identifier(
+            texts,
+            full_name=patient.patient_alias,
+            phone_e164=patient.phone_e164,
+            member_id=insurance.get("memberId"),
+            policy_number=insurance.get("policyNumber"),
+            case_id=journey.case_id,
+            filename=(journey.source_document or {}).get("filename"),
+        )
+
+    @staticmethod
     def _call_times(plan: dict, approved_at: datetime) -> list[datetime]:
         if plan.get("firstCallAt"):
             first = datetime.fromisoformat(plan["firstCallAt"])
@@ -626,7 +653,7 @@ def drafted_content(
     *,
     medications: list[dict],
     call_plan: dict,
-    label: str,
+    label: str | None,
     language: str,
     dialect: str,
 ) -> tuple[dict, dict]:

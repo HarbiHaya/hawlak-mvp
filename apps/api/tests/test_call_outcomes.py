@@ -141,6 +141,65 @@ def test_completed_call_outcome_is_idempotent_without_alert(
     assert caregiver.json()["nextCallAt"] is None
 
 
+def test_failed_call_outcome_is_idempotent_and_opens_one_minimized_alert(
+    client, internal_auth_headers, db_session
+):
+    runs = approved_runs(client, internal_auth_headers)
+    call_run = next(run for run in runs if run["kind"] == "follow_up_call")
+    mark_sent(client, internal_auth_headers, call_run["id"])
+    payload = {
+        "status": "failed",
+        "providerRef": "synthetic-failed-call",
+        "escalation": {"questionId": "red-flag", "answerKind": "uncertain"},
+    }
+    headers = {**internal_auth_headers, "Idempotency-Key": "call-outcome-failed-01"}
+    url = f"/internal/delivery-runs/{call_run['id']}/call-outcome"
+
+    first = client.post(url, json=payload, headers=headers)
+    replay = client.post(url, json=payload, headers=headers)
+
+    assert first.status_code == 200
+    assert first.json() == replay.json()
+    assert first.json()["status"] == "failed"
+    assert db_session.query(Alert).count() == 1
+    assert db_session.query(WorkflowEvent).count() == 1
+    alert = db_session.query(Alert).one()
+    event = db_session.query(WorkflowEvent).one()
+    assert alert.type == "call_escalation"
+    assert alert.summary == "Call escalation: uncertain at approved question red-flag"
+    assert event.event_type == "call_outcome"
+    assert event.idempotency_key == "call-outcome-failed-01"
+    assert event.payload == {"runId": call_run["id"], **payload}
+    caregiver = client.get(
+        "/internal/caregiver/cases/case_call_outcome", headers=internal_auth_headers
+    )
+    assert caregiver.json()["openAlertCount"] == 1
+    assert caregiver.json()["nextCallAt"] is None
+
+
+def test_failed_call_outcome_requires_a_valid_minimized_escalation(client, internal_auth_headers):
+    runs = approved_runs(client, internal_auth_headers)
+    call_run = next(run for run in runs if run["kind"] == "follow_up_call")
+    mark_sent(client, internal_auth_headers, call_run["id"])
+    url = f"/internal/delivery-runs/{call_run['id']}/call-outcome"
+    headers = {**internal_auth_headers, "Idempotency-Key": "invalid-failed-outcome"}
+
+    missing = client.post(url, json={"status": "failed"}, headers=headers)
+    unknown_question = client.post(
+        url,
+        json={
+            "status": "failed",
+            "escalation": {"questionId": "not-approved", "answerKind": "red_flag"},
+        },
+        headers=headers,
+    )
+
+    assert missing.status_code == 422
+    assert unknown_question.status_code == 409
+    assert unknown_question.json() == {"error": "call_question_not_approved"}
+    assert db_session_status(client, internal_auth_headers, call_run["id"]) == "sent"
+
+
 def test_call_outcome_rejects_conflicting_replays_without_duplicate_events_or_alerts(
     client, internal_auth_headers, db_session
 ):

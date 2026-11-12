@@ -309,7 +309,7 @@ class CareJourneyService:
         if prior_outcome is not None:
             raise JourneyConflict("call_outcome_already_recorded")
 
-        if status == "transferred":
+        if status in {"transferred", "failed"}:
             journey = self.session.get(CareJourney, run.case_id)
             approved_question_ids = {
                 question["id"]
@@ -324,7 +324,7 @@ class CareJourneyService:
         if run.status != "sent":
             raise JourneyConflict("call_run_not_sent")
 
-        if status == "transferred":
+        if status in {"transferred", "failed"}:
             answer_kind = escalation["answerKind"]
             alert_key = f"{run.id}:call_escalation"
             alert = self.session.scalar(select(Alert).where(Alert.idempotency_key == alert_key))

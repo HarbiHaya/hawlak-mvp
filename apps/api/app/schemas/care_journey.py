@@ -101,14 +101,14 @@ class CallEscalation(CamelModel):
 
 
 class CallOutcomeRequest(CamelModel):
-    status: Literal["completed", "transferred"]
+    status: Literal["completed", "transferred", "failed"]
     provider_ref: str | None = Field(default=None, max_length=256)
     escalation: CallEscalation | None = None
 
     @model_validator(mode="after")
     def validate_escalation(self):
-        if self.status == "transferred" and self.escalation is None:
-            raise ValueError("a transferred call requires an escalation")
+        if self.status in {"transferred", "failed"} and self.escalation is None:
+            raise ValueError(f"a {self.status} call requires an escalation")
         if self.status == "completed" and self.escalation is not None:
             raise ValueError("a completed call cannot include an escalation")
         return self

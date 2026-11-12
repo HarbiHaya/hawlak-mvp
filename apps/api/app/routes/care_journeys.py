@@ -4,7 +4,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, Header, Request, Response
 from fastapi.responses import JSONResponse
 
-from app.config import get_settings
+from app.config import SettingsDep
 from app.db import SessionDep
 from app.models import CareJourney
 from app.schemas.care_journey import (
@@ -38,8 +38,8 @@ FILE_TYPES = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpe
 FILE_TYPES |= {".jpeg": "image/jpeg", ".webp": "image/webp"}
 
 
-def get_journey_drafter():
-    return build_journey_drafter(get_settings())
+def get_journey_drafter(settings: SettingsDep):
+    return build_journey_drafter(settings)
 
 
 DrafterDep = Annotated[object, Depends(get_journey_drafter)]
@@ -161,9 +161,9 @@ def list_workspace_cases(session: SessionDep):
 
 
 @router.get("/workspace/cases/{case_id}")
-def workspace_case_detail(case_id: str, session: SessionDep):
+def workspace_case_detail(case_id: str, session: SessionDep, settings: SettingsDep):
     try:
-        return _detail(CareJourneyService(session), case_id)
+        return _detail(CareJourneyService(session), case_id, settings)
     except JourneyNotFound as exc:
         return error_response(exc)
 
@@ -179,7 +179,13 @@ def case_file(case_id: str, key: str, session: SessionDep, storage: StorageDep):
 
 
 @router.post("/workspace/cases/{case_id}/draft")
-def regenerate_draft(case_id: str, session: SessionDep, storage: StorageDep, drafter: DrafterDep):
+def regenerate_draft(
+    case_id: str,
+    session: SessionDep,
+    storage: StorageDep,
+    drafter: DrafterDep,
+    settings: SettingsDep,
+):
     """Redraft the voice note, reminders and call scripts from the PDF and current medicines."""
     journey = session.get(CareJourney, case_id)
     pdf = _case_bytes(case_id, journey.source_document["objectKey"], storage) if journey else None
@@ -191,17 +197,19 @@ def regenerate_draft(case_id: str, session: SessionDep, storage: StorageDep, dra
     service = CareJourneyService(session)
     try:
         service.regenerate(case_id, extraction, drafter)
-        return _detail(service, case_id)
+        return _detail(service, case_id, settings)
     except (JourneyNotFound, JourneyConflict) as exc:
         return error_response(exc)
 
 
 @router.post("/workspace/cases/{case_id}/eligibility")
-def check_eligibility(case_id: str, body: EligibilityRequest, session: SessionDep):
+def check_eligibility(
+    case_id: str, body: EligibilityRequest, session: SessionDep, settings: SettingsDep
+):
     service = CareJourneyService(session)
     try:
         service.check_eligibility(case_id, body.member_id)
-        return _detail(service, case_id)
+        return _detail(service, case_id, settings)
     except (JourneyNotFound, JourneyConflict) as exc:
         return error_response(exc)
 
@@ -217,9 +225,9 @@ def case_extraction(case_id: str, session: SessionDep, storage: StorageDep):
     return parse_discharge_pdf(content).to_api()
 
 
-def _detail(service: CareJourneyService, case_id: str) -> dict:
+def _detail(service: CareJourneyService, case_id: str, settings) -> dict:
     # In mock mode the worker marks runs sent without contacting WhatsApp or the caller.
-    return {**service.detail(case_id), "deliveryMode": get_settings().demo_provider_mode}
+    return {**service.detail(case_id), "deliveryMode": settings.demo_provider_mode}
 
 
 def _case_bytes(case_id: str, key: str, storage) -> bytes | None:

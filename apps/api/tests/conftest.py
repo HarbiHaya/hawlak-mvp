@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import Settings, get_settings
 from app.db import Base, get_db_session
 from app.main import app
+from app.services.object_storage import ObjectStorageError, get_object_storage
 from app.services.whatsapp_client import WhatsAppClient
 
 SETTINGS_VALUES = {
@@ -77,10 +78,18 @@ def db_session():
     engine.dispose()
 
 
+class EmptyStorage:
+    """Default test storage: holds nothing, so tests never reach a real bucket."""
+
+    def get_bytes(self, key: str) -> bytes:
+        raise ObjectStorageError(f"no object at {key}")
+
+
 @pytest.fixture
 def client(settings, db_session):
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_db_session] = lambda: db_session
+    app.dependency_overrides[get_object_storage] = EmptyStorage
     app.state.dashboard_origin = settings.dashboard_origin
     yield TestClient(app)
     app.dependency_overrides.clear()

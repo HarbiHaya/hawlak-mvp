@@ -1,0 +1,23 @@
+{$PUBLIC_HOSTNAME} {
+    encode zstd gzip
+
+    handle_path /api/* {
+        reverse_proxy api:3000
+    }
+
+    handle /webhooks/* {
+        reverse_proxy webhook:3001
+    }
+
+    handle {
+        reverse_proxy dashboard:80
+    }
+
+    header {
+        -Server
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
+    }
+}

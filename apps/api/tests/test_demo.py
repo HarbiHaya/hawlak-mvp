@@ -17,7 +17,7 @@ def test_send_text_sends_the_demo_message_to_the_test_recipient(
     assert response.status_code == 202
     assert response.json() == {"messageId": "wamid.DEMO"}
     sent = json.loads(seen[0].content)
-    assert sent["to"] == "+966500000000"
+    assert sent["to"] == "966500000000"
     assert sent["type"] == "text"
 
 

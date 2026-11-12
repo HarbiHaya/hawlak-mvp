@@ -14,7 +14,7 @@ class FakeReadStorage:
 def seed_review_event(db_session):
     case = PatientCase(
         id="case_01",
-        patient_alias="أبو محمد",
+        patient_alias="محمد عبدالله السالم",
         phone_e164="+966500000000",
         dialect_code="ar-SA-najdi",
         expected_box_count=1,
@@ -47,7 +47,7 @@ def seed_review_event(db_session):
         "occurredAt": datetime.now(UTC).isoformat(),
         "case": {
             "caseId": "case_01",
-            "patientAlias": "أبو محمد",
+            "patientAlias": "محمد عبدالله السالم",
             "phoneE164Masked": "+9665*****000",
             "expectedBoxCount": 1,
             "receivedBoxCount": 1,
@@ -105,6 +105,9 @@ def test_polling_media_and_outcome_flow(client, internal_auth_headers, db_sessio
     assert created.status_code == 201
     assert replay.status_code == 200
     assert created.json() == replay.json()
+
+    reloaded_queue = client.get("/internal/review-events", headers=internal_auth_headers)
+    assert reloaded_queue.json()["data"] == []
 
 
 def test_review_routes_enforce_auth_cursor_and_conflicts(client, internal_auth_headers, db_session):

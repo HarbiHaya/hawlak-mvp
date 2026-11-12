@@ -13,6 +13,7 @@ from sqlalchemy.pool import StaticPool
 from app.config import Settings, get_settings
 from app.db import Base, get_db_session
 from app.main import app
+from app.services.object_storage import ObjectStorageError, get_object_storage
 from app.services.whatsapp_client import WhatsAppClient
 
 SETTINGS_VALUES = {
@@ -28,6 +29,7 @@ SETTINGS_VALUES = {
     "s3_access_key": "hawlak-test",
     "s3_secret_key": "test-secret-long-enough",
     "internal_api_token": "test-internal-api-token-long-enough",
+    "demo_login_password": "synthetic-demo-password",
     "dashboard_origin": "http://localhost:5173",
     "database_url": "sqlite:///:memory:",
 }
@@ -48,7 +50,7 @@ def fixtures_dir() -> Path:
 
 @pytest.fixture
 def plan() -> dict:
-    """The synthetic approved plan for the demo case (أبو محمد)."""
+    """The synthetic approved plan for the demo case."""
     return json.loads((FIXTURES / "approved-plan.abu-mohammed.json").read_text(encoding="utf-8"))
 
 
@@ -76,10 +78,18 @@ def db_session():
     engine.dispose()
 
 
+class EmptyStorage:
+    """Default test storage: holds nothing, so tests never reach a real bucket."""
+
+    def get_bytes(self, key: str) -> bytes:
+        raise ObjectStorageError(f"no object at {key}")
+
+
 @pytest.fixture
 def client(settings, db_session):
     app.dependency_overrides[get_settings] = lambda: settings
     app.dependency_overrides[get_db_session] = lambda: db_session
+    app.dependency_overrides[get_object_storage] = EmptyStorage
     app.state.dashboard_origin = settings.dashboard_origin
     yield TestClient(app)
     app.dependency_overrides.clear()

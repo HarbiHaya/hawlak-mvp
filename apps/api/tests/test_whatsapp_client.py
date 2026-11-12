@@ -28,7 +28,7 @@ async def test_send_text_posts_a_text_message_and_returns_its_id(fake_meta):
     assert json.loads(request.content) == {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": RECIPIENT,
+        "to": "966500000000",
         "type": "text",
         "text": {"preview_url": False, "body": "مرحبا"},
     }
@@ -64,7 +64,7 @@ async def test_send_audio_posts_an_audio_message_that_references_the_media_id(fa
     assert json.loads(seen[0].content) == {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": RECIPIENT,
+        "to": "966500000000",
         "type": "audio",
         "audio": {"id": "media-1"},
     }
@@ -106,6 +106,44 @@ def media_client(handler) -> WhatsAppClient:
         "test-token",
         transport=httpx.MockTransport(handler),
     )
+
+
+async def test_upload_image_and_send_two_choice_reminder_without_a_link():
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        if request.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "image-media-1"}, request=request)
+        return httpx.Response(
+            200,
+            json={"messages": [{"id": "wamid.reminder"}]},
+            request=request,
+        )
+
+    whatsapp = media_client(handler)
+    image_id = await whatsapp.upload_image(
+        b"synthetic-image",
+        "medicine.jpg",
+        "image/jpeg",
+    )
+    message_id = await whatsapp.send_photo_reminder(RECIPIENT, image_id)
+
+    assert image_id == "image-media-1"
+    assert message_id == "wamid.reminder"
+    assert b'filename="medicine.jpg"' in seen[0].content
+    payload = json.loads(seen[1].content)
+    assert payload["to"] == "966500000000"
+    assert payload["type"] == "interactive"
+    assert payload["interactive"]["header"] == {
+        "type": "image",
+        "image": {"id": "image-media-1"},
+    }
+    assert payload["interactive"]["action"]["buttons"] == [
+        {"type": "reply", "reply": {"id": "taken", "title": "1"}},
+        {"type": "reply", "reply": {"id": "not_yet", "title": "2"}},
+    ]
+    assert "url" not in json.dumps(payload).lower()
 
 
 async def test_download_image_fetches_metadata_then_bounded_https_bytes():

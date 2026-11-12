@@ -1,0 +1,49 @@
+flowchart TB
+  classDef actor fill:#FFF7E8,stroke:#8A5A00,color:#1E1E1E
+  classDef platform fill:#E8F5EE,stroke:#177245,color:#102A20
+  classDef external fill:#F3EDFF,stroke:#6941C6,color:#241547
+  classDef data fill:#EAF2FF,stroke:#175CD3,color:#102A56
+  classDef planned fill:#EEF1F5,stroke:#667085,color:#202939,stroke-dasharray: 5 4
+
+  H["Hospital discharge user"]:::actor
+  I["Integrated-care clinical reviewer"]:::actor
+  P["Patient"]:::actor
+  C["Authorized caregiver"]:::actor
+  R["Clinical responder"]:::actor
+
+  UI["Role-scoped web app"]:::platform
+  CORE["Workflow API"]:::platform
+  DRAFT["PDF parser, draft,<br/>review and approval"]:::platform
+  DATA[("PostgreSQL and<br/>private object storage")]:::data
+  QUEUE["Approved delivery worker"]:::platform
+  HOOK["Signed webhook intake<br/>validates and writes minimal event"]:::platform
+  CARE["Limited caregiver view"]:::platform
+  CALL["Constrained call agent<br/>returns only minimal outcome"]:::platform
+
+  TTS["Speech rendering<br/>external demo processor"]:::external
+  WA["Meta WhatsApp Cloud API<br/>live path not verified"]:::external
+  TEL["LiveKit and Telnyx<br/>live path not verified"]:::external
+
+  H -->|"PDF plus intake fields"| UI
+  I -->|"review, edit and approve"| UI
+  UI --> CORE
+  CORE --> DRAFT
+  DRAFT -->|"reviewed draft and approval state"| DATA
+  DATA -->|"approved due runs"| QUEUE
+  QUEUE -->|"exact approved script"| TTS
+  TTS -->|"rendered audio"| QUEUE
+  QUEUE -->|"routing phone plus minimized media"| WA
+  WA -->|"voice note, image, buttons 1 and 2"| P
+  P -->|"reply or medicine photo"| WA
+  WA -->|"signed event"| HOOK
+  QUEUE -->|"approved call-plan ID"| CALL
+  CALL -->|"call media"| TEL
+  TEL <--> P
+  TEL -->|"live transfer"| R
+  DATA --> CARE
+  CARE -->|"limited status"| C
+
+  ALT["Saudi-hosted audio plus<br/>short-lived SMS link — PLANNED"]:::planned
+  QUEUE -.-> ALT
+  ALT -.->|"extra click and optional verification"| P
+

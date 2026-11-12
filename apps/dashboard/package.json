@@ -4,26 +4,21 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
-    "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run"
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.json && vite build",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
     "@hawlak/contracts": "0.1.0",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "zod": "^4.6.7"
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@types/node": "^26.6.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "@vitejs/plugin-react": "^6.0.0",
-    "jsdom": "^27.0.0",
-    "typescript": "^5.9.3",
-    "vite": "^8.3.5",
-    "vitest": "^4.1.12"
+    "typescript": "^5.7.3",
+    "vite": "^7.2.0",
+    "vitest": "^4.1.0"
   }
 }

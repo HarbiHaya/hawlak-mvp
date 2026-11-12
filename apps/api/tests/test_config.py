@@ -22,6 +22,15 @@ def test_accepts_a_complete_valid_configuration(settings_values):
     assert settings.elevenlabs_similarity_boost == 0.8
 
 
+def test_accepts_an_https_dashboard_origin_for_the_hosted_demo(settings_values):
+    settings = Settings(
+        _env_file=None,
+        **{**settings_values, "dashboard_origin": "https://demo.hawlak.example"},
+    )
+
+    assert settings.dashboard_origin == "https://demo.hawlak.example"
+
+
 def test_twilio_provider_requires_its_sandbox_credentials(settings_values):
     with pytest.raises(ValidationError):
         Settings(_env_file=None, **{**settings_values, "whatsapp_provider": "twilio"})
@@ -42,6 +51,51 @@ def test_twilio_provider_requires_its_sandbox_credentials(settings_values):
     assert settings.twilio_whatsapp_from == "+14155238886"
 
 
+def test_twilio_provider_does_not_require_unused_meta_credentials(settings_values):
+    twilio_values = {
+        key: value
+        for key, value in settings_values.items()
+        if key
+        not in {
+            "meta_graph_api_version",
+            "whatsapp_phone_number_id",
+            "whatsapp_access_token",
+            "whatsapp_verify_token",
+            "meta_app_secret",
+            "whatsapp_test_recipient",
+        }
+    }
+
+    settings = Settings(
+        _env_file=None,
+        **{
+            **twilio_values,
+            "whatsapp_provider": "twilio",
+            "public_base_url": "https://hawlak.example",
+            "twilio_account_sid": "AC" + "1" * 32,
+            "twilio_auth_token": "twilio-test-auth-token-long-enough",
+        },
+    )
+
+    assert settings.whatsapp_provider == "twilio"
+    assert settings.whatsapp_test_recipient is None
+
+
+def test_meta_provider_requires_only_its_own_credentials(settings_values):
+    for field in (
+        "meta_graph_api_version",
+        "whatsapp_phone_number_id",
+        "whatsapp_access_token",
+        "whatsapp_verify_token",
+        "meta_app_secret",
+    ):
+        values = dict(settings_values)
+        values.pop(field)
+
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None, **values)
+
+
 @pytest.mark.parametrize(
     ("field", "value"),
     [
@@ -57,8 +111,8 @@ def test_twilio_provider_requires_its_sandbox_credentials(settings_values):
         ("s3_access_key", ""),
         ("s3_secret_key", "short"),
         ("internal_api_token", "too-short"),
-        ("dashboard_origin", "https://localhost:5173"),
         ("dashboard_origin", "http://127.0.0.1:5173"),
+        ("dashboard_origin", "https://demo.hawlak.example/path"),
         ("dashboard_origin", "http://localhost:5173/path"),
         ("dashboard_origin", "http://localhost:70000"),
         ("database_url", "mysql://localhost/hawlak"),

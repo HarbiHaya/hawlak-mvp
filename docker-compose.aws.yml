@@ -1,0 +1,100 @@
+# AWS demo: one EC2 instance behind CloudFront (HTTPS). Files live in S3 through the
+# instance role, so there is no MinIO and no S3 keys. Secrets come from SSM Parameter
+# Store as .env (see deploy/aws/README.md).
+name: hawlak
+
+x-api: &api
+  build: ./apps/api
+  restart: unless-stopped
+  env_file: .env
+  environment: &api-env
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-hawlak}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-hawlak}
+  depends_on:
+    postgres:
+      condition: service_healthy
+  networks: [private]
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hawlak}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
+      POSTGRES_DB: ${POSTGRES_DB:-hawlak}
+    volumes:
+      - postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks: [private]
+
+  api:
+    <<: *api
+    expose: ["3000"]
+
+  webhook:
+    <<: *api
+    command: uvicorn app.webhook_main:app --host 0.0.0.0 --port 3001 --no-access-log
+    depends_on: [api]
+    expose: ["3001"]
+
+  delivery-worker:
+    <<: *api
+    command: python -m app.delivery_worker
+    depends_on: [api]
+
+  # Live calls only: start with `--profile voice` once LiveKit keys are in .env.
+  agent:
+    build: ./apps/agent
+    profiles: [voice]
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      HAWLAK_API_BASE_URL: http://api:3000
+      HAWLAK_INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+      HAWLAK_AGENT_CONTROL_PORT: "3100"
+    depends_on: [api]
+    expose: ["3100"]
+    networks: [private]
+
+  voice-worker:
+    build: ./apps/agent
+    profiles: [voice]
+    restart: unless-stopped
+    command: hawlak-agent start
+    env_file: .env
+    environment:
+      HAWLAK_API_BASE_URL: http://api:3000
+      HAWLAK_INTERNAL_API_TOKEN: ${INTERNAL_API_TOKEN}
+    depends_on: [api]
+    networks: [private]
+
+  dashboard:
+    build:
+      context: .
+      dockerfile: apps/dashboard/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api
+    restart: unless-stopped
+    expose: ["80"]
+    networks: [private]
+
+  caddy:
+    image: caddy:2.10-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/aws/Caddyfile:/etc/caddy/Caddyfile:ro
+    depends_on: [api, webhook, dashboard]
+    networks: [private]
+
+volumes:
+  postgres:
+
+networks:
+  private:
+    driver: bridge

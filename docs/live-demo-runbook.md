@@ -1,7 +1,7 @@
 # Hawlak synthetic demo runbook
 
 > **Synthetic prototype only. Not for clinical use.** Use Meta's test number and
-> the fictional أبو محمد fixture only. Never enter real patient data or real
+> the fictional synthetic-patient fixture only. Never enter real patient data or real
 > medicine instructions.
 
 ## What is already connected

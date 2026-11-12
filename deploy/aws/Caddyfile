@@ -1,0 +1,26 @@
+# CloudFront terminates HTTPS and is the only client allowed on port 80
+# (security group: CloudFront origin-facing prefix list).
+:80 {
+    encode zstd gzip
+
+    handle_path /api/* {
+        reverse_proxy api:3000
+    }
+
+    handle /webhooks/* {
+        reverse_proxy webhook:3001
+    }
+
+    handle {
+        reverse_proxy dashboard:80
+    }
+
+    header {
+        -Server
+        Strict-Transport-Security "max-age=31536000"
+        X-Content-Type-Options nosniff
+        X-Frame-Options DENY
+        Referrer-Policy no-referrer
+        Permissions-Policy "camera=(), geolocation=(), microphone=()"
+    }
+}

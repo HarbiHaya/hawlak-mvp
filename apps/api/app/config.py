@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     # Local-demo access boundary. Replace this token scheme before non-local deployment.
     internal_api_token: SecretStr = Field(min_length=24)
+    demo_login_password: SecretStr = Field(min_length=12)
+    demo_session_minutes: int = Field(default=480, ge=15, le=1440)
     dashboard_origin: str
     public_base_url: str = "http://localhost:3001"
     hawlak_agent_control_url: str | None = None

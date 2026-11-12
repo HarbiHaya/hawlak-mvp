@@ -28,6 +28,7 @@ SETTINGS_VALUES = {
     "s3_access_key": "hawlak-test",
     "s3_secret_key": "test-secret-long-enough",
     "internal_api_token": "test-internal-api-token-long-enough",
+    "demo_login_password": "synthetic-demo-password",
     "dashboard_origin": "http://localhost:5173",
     "database_url": "sqlite:///:memory:",
 }

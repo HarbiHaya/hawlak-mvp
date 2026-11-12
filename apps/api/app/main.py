@@ -9,7 +9,7 @@ from starlette.middleware.cors import CORSMiddleware
 from starlette.types import ASGIApp
 
 from app.config import get_settings
-from app.routes import health, internal, storage, twilio_webhook, whatsapp_webhook
+from app.routes import auth, health, internal, storage, twilio_webhook, whatsapp_webhook
 from app.services.whatsapp_client import MetaApiError, WhatsAppApiError
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,6 +45,7 @@ app.add_middleware(
     origin_provider=lambda: app.state.dashboard_origin,
 )
 app.include_router(health.router)
+app.include_router(auth.router)
 app.include_router(storage.router)
 app.include_router(whatsapp_webhook.router)
 app.include_router(twilio_webhook.router)

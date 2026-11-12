@@ -53,6 +53,90 @@ class PatientCase(Base):
     )
 
 
+class CareJourney(Base):
+    """Insurer-reviewable discharge journey for the small POC workflow."""
+
+    __tablename__ = "care_journeys"
+    __table_args__ = (
+        CheckConstraint(
+            "review_status IN ('draft', 'approved')", name="ck_care_journeys_review_status"
+        ),
+        Index("ix_care_journeys_review_status", "review_status", "updated_at"),
+    )
+
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("patient_cases.id", ondelete="CASCADE"), primary_key=True
+    )
+    preferred_form_of_address: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    language_code: Mapped[str] = mapped_column(String(20))
+    source_document: Mapped[dict[str, Any]] = mapped_column(JSON_VALUE)
+    discharge_voice_note: Mapped[dict[str, Any]] = mapped_column(JSON_VALUE)
+    medications: Mapped[list[dict[str, Any]]] = mapped_column(JSON_VALUE)
+    call_plan: Mapped[dict[str, Any]] = mapped_column(JSON_VALUE)
+    review_status: Mapped[str] = mapped_column(String(20), default="draft")
+    approved_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    approved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    approval_idempotency_key: Mapped[str | None] = mapped_column(
+        String(256), nullable=True, unique=True
+    )
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class DeliveryRun(Base):
+    __tablename__ = "delivery_runs"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_delivery_runs_idempotency_key"),
+        CheckConstraint(
+            "kind IN ('discharge_voice_note', 'medication_reminder', 'follow_up_call')",
+            name="ck_delivery_runs_kind",
+        ),
+        CheckConstraint(
+            "status IN ('pending', 'claimed', 'sent', 'completed', 'failed', 'transferred')",
+            name="ck_delivery_runs_status",
+        ),
+        Index("ix_delivery_runs_case_status", "case_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True, default=new_id)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("patient_cases.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(40))
+    status: Mapped[str] = mapped_column(String(20), default="pending")
+    idempotency_key: Mapped[str] = mapped_column(String(256))
+    content_ref: Mapped[str] = mapped_column(String(200))
+    scheduled_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    provider_ref: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now
+    )
+
+
+class Alert(Base):
+    __tablename__ = "alerts"
+    __table_args__ = (
+        UniqueConstraint("idempotency_key", name="uq_alerts_idempotency_key"),
+        CheckConstraint("status IN ('open', 'resolved')", name="ck_alerts_status"),
+        Index("ix_alerts_case_status", "case_id", "status"),
+    )
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True, default=new_id)
+    case_id: Mapped[str] = mapped_column(
+        ForeignKey("patient_cases.id", ondelete="CASCADE"), nullable=False
+    )
+    type: Mapped[str] = mapped_column(String(64))
+    severity: Mapped[str] = mapped_column(String(20))
+    status: Mapped[str] = mapped_column(String(20), default="open")
+    summary: Mapped[str] = mapped_column(String(300))
+    idempotency_key: Mapped[str] = mapped_column(String(256))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
 class ApprovedPlan(Base):
     __tablename__ = "approved_plans"
     __table_args__ = (

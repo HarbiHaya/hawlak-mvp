@@ -4,7 +4,7 @@
   "case": {
     "caseId": "case_01",
     "patientRef": "SYN-PAT-001",
-    "patientAlias": "أبو محمد",
+    "patientAlias": "محمد عبدالله السالم",
     "dialectCode": "ar-SA-najdi",
     "expectedBoxCount": 3
   },

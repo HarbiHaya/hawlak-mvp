@@ -68,7 +68,7 @@ describe("HawlakApi", () => {
   });
 
   it("loads the auditable delivery and patient-choice timeline", async () => {
-    const fetcher = vi.fn(async () =>
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(
         JSON.stringify({
           caseId: "case-1",
@@ -102,5 +102,152 @@ describe("HawlakApi", () => {
       "http://127.0.0.1:3000/internal/cases/case-1/timeline",
       expect.objectContaining({ headers: expect.any(Headers) }),
     );
+  });
+
+  it("loads the insurer case queue through the workspace interface", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          data: [
+            {
+              caseId: "case-1",
+              patientName: "محمد عبدالله السالم",
+              preferredFormOfAddress: "أبو محمد",
+              dialectCode: "ar-SA-najdi",
+              languageCode: "ar",
+              reviewStatus: "draft",
+              submittedAt: "2026-11-12T09:00:00Z",
+              alertCount: 1,
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const api = new HawlakApi("http://127.0.0.1:3000", "token", fetcher);
+
+    const result = await api.listWorkspaceCases();
+
+    expect(result.data[0]?.patientName).toBe("محمد عبدالله السالم");
+    expect(fetcher).toHaveBeenCalledWith(
+      "http://127.0.0.1:3000/internal/workspace/cases",
+      expect.objectContaining({ headers: expect.any(Headers) }),
+    );
+  });
+
+  it("uploads the hospital PDF before it creates the discharge case", async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/documents")) {
+        return new Response(
+          JSON.stringify({ objectKey: "synthetic/case-new.pdf", filename: "synthetic-discharge.pdf" }),
+          { status: 201, headers: { "Content-Type": "application/json" } },
+        );
+      }
+      return new Response(
+        JSON.stringify({ caseId: "case-new", reviewStatus: "awaiting_review" }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      );
+    });
+    const api = new HawlakApi("http://127.0.0.1:3000", "token", fetcher);
+    const document = new File(["synthetic"], "synthetic-discharge.pdf", {
+      type: "application/pdf",
+    });
+
+    await api.submitDischargePacket({
+      document,
+      patientFullName: "محمد عبدالله السالم",
+      preferredAddress: "أبو محمد",
+      phoneE164: "+966500000001",
+      languageCode: "ar",
+      dialectCode: "ar-SA-najdi",
+    });
+
+    expect(fetcher).toHaveBeenCalledTimes(2);
+    const [uploadUrl, uploadInit] = fetcher.mock.calls[0] ?? [];
+    expect(uploadUrl).toBe("http://127.0.0.1:3000/internal/workspace/documents");
+    expect(uploadInit?.body).toBe(document);
+    expect(new Headers(uploadInit?.headers).get("Content-Type")).toBe("application/pdf");
+    expect(new Headers(uploadInit?.headers).get("X-Filename")).toBe("synthetic-discharge.pdf");
+    const [createUrl, createInit] = fetcher.mock.calls[1] ?? [];
+    expect(createUrl).toBe("http://127.0.0.1:3000/internal/workspace/cases");
+    expect(JSON.parse(String(createInit?.body))).toEqual(
+      expect.objectContaining({
+        patientName: "محمد عبدالله السالم",
+        preferredFormOfAddress: "أبو محمد",
+        sourceDocument: {
+          objectKey: "synthetic/case-new.pdf",
+          filename: "synthetic-discharge.pdf",
+        },
+      }),
+    );
+  });
+
+  it("omits browser authorization when the hosted proxy owns authentication", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ data: [] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const api = new HawlakApi("/api", "", fetcher);
+
+    await api.listWorkspaceCases();
+
+    const [, init] = fetcher.mock.calls[0] ?? [];
+    expect(new Headers(init?.headers).has("Authorization")).toBe(false);
+  });
+
+  it("uploads a reviewed medication image through the case interface", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          objectKey: "cases/case-1/media/medicine.jpg",
+          filename: "medicine.jpg",
+          contentType: "image/jpeg",
+        }),
+        { status: 201, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const api = new HawlakApi("/api", "", fetcher);
+    const image = new File(["synthetic"], "medicine.jpg", { type: "image/jpeg" });
+
+    const result = await api.uploadMedicationImage("case-1", image);
+
+    expect(result.objectKey).toBe("cases/case-1/media/medicine.jpg");
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect(url).toBe("/api/internal/workspace/cases/case-1/medication-images");
+    expect(init?.body).toBe(image);
+    expect(new Headers(init?.headers).get("Content-Type")).toBe("image/jpeg");
+    expect(new Headers(init?.headers).get("X-Filename")).toBe("medicine.jpg");
+  });
+
+  it("approves exact reviewed content and receives queued delivery runs", async () => {
+    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(
+        JSON.stringify({
+          caseId: "case-1",
+          reviewStatus: "approved",
+          deliveryRuns: [
+            {
+              id: "run-1",
+              kind: "discharge_voice_note",
+              status: "pending",
+              scheduledAt: "2026-11-12T12:00:00Z",
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      ),
+    );
+    const api = new HawlakApi("/api", "", fetcher);
+
+    const result = await api.approveWorkspaceCase("case-1", "SYN-REVIEWER", "approve-1");
+
+    expect(result.deliveryRuns[0]?.kind).toBe("discharge_voice_note");
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect(url).toBe("/api/internal/workspace/cases/case-1/approve");
+    expect(JSON.parse(String(init?.body))).toEqual({ approvedBy: "SYN-REVIEWER" });
+    expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("approve-1");
   });
 });

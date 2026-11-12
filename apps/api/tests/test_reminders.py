@@ -34,7 +34,7 @@ class FakeRenderer:
 def seed_stored_photo(db_session):
     case = PatientCase(
         id="case_01",
-        patient_alias="أبو محمد",
+        patient_alias="محمد عبدالله السالم",
         phone_e164="+966500000000",
         dialect_code="ar-SA-najdi",
         expected_box_count=1,

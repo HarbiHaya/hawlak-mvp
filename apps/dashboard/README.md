@@ -1,8 +1,8 @@
 # Hawlak dashboard
 
-Arabic-first React/Vite operator dashboard for the synthetic Hawlak prototype.
-It drives the complete demo without exposing OpenAI, ElevenLabs, Twilio,
-PostgreSQL or MinIO credentials to the browser.
+Bilingual React/Vite workspace for the synthetic Hawlak proof of concept. One
+application exposes only the tools allowed for each role. Provider, database and
+storage credentials never reach the browser.
 
 ## Run
 
@@ -13,39 +13,38 @@ npm install
 npm run dev -w apps/dashboard
 ```
 
-Open <http://localhost:5173>. Paste `INTERNAL_API_TOKEN` when prompted. The
-token stays only in React memory: it is never written to local storage, a URL,
-a cookie or a `VITE_*` build variable.
+Open <http://localhost:5173>. In local development, paste `INTERNAL_API_TOKEN`
+when prompted. The token stays in React memory. The hosted dashboard uses the
+same-origin `/api` proxy, which adds the token on the server.
 
-## Product flows
+## Role workspaces
 
-### Send a voice pack
+### Hospital
 
-1. Enter a Twilio Sandbox recipient in E.164 format.
-2. Choose Hijazi, Najdi or Southern Saudi.
-3. Create a fresh synthetic case and generate the two audio-first scripts.
-4. Review both scripts and the clinical-fact check.
-5. Explicitly approve the unchanged bundle checksum.
-6. Send the session summary and recovery/warning voice notes.
+The discharge user enters the registered patient name and test number, chooses
+language and dialect, and uploads the discharge PDF. The hospital does not edit
+insurer service eligibility or approve generated patient content.
 
-### Review medicine photos
+### Insurer
 
-The dashboard polls replay-safely, validates every event with
-`@hawlak/contracts`, loads stored photos through the authenticated API and lets
-the pharmacist record one of four outcomes. Object URLs are revoked when the
-photo leaves the screen.
+The integrated-care reviewer sees a compact case queue. They can verify the
+extracted discharge instructions, edit the exact voice-note and call text,
+approve medication images, choose the follow-up schedule, decide whether the
+member receives Hawlak, and approve the journey. Dispatch remains disabled until
+the required content is approved.
 
-The review task also includes **Send demo reminder now**. It sends:
+### Caregiver
 
-1. a Saudi Arabic voice note explaining `١ = أخذتها` and `٢ = لسه`;
-2. the same medicine photo the patient sent;
-3. two numeric WhatsApp quick replies, while the backend records semantic
-   values `taken` and `not_yet`.
+The caregiver sees adherence state, the next action, and open escalation status.
+They do not see the full discharge document, insurer fields, or internal notes.
+The current proof of concept is web-based; a caregiver app can reuse this API
+later.
 
-### WhatsApp connection
+### Patient channels
 
-The connection screen distinguishes the shared, Twilio-branded Sandbox from a
-registered Hawlak sender. Use `scripts/setup_twilio_sender.sh` for the latter.
+The patient does not use this dashboard. Hawlak sends the minimized approved
+voice note and approved medication image through Meta WhatsApp, with only `1`
+and `2` response buttons. Scheduled follow-up uses the telephone channel.
 
 ## Verification
 
@@ -55,5 +54,5 @@ npm test -w apps/dashboard
 npm run build -w apps/dashboard
 ```
 
-The UI is responsive down to 390 px, uses RTL layout, respects reduced-motion
-preferences and exposes visible keyboard focus.
+The UI is responsive down to 390 px, supports Arabic RTL and English LTR,
+respects reduced-motion preferences, and exposes visible keyboard focus.

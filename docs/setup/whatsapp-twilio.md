@@ -96,7 +96,7 @@ active in the consumer WhatsApp apps.
 Run the repeatable setup wizard from the repository root:
 
 ```bash
-./scripts/setup_twilio_sender.sh
+./scripts/setup_live_demo.sh
 ```
 
 It uses

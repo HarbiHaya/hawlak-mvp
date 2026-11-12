@@ -21,6 +21,7 @@ _MEDIA_EXTENSIONS = {
     "image/heic": ".heic",
     "image/heif": ".heif",
     "audio/ogg": ".ogg",
+    "application/pdf": ".pdf",
 }
 
 

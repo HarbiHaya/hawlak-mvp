@@ -43,7 +43,7 @@ def test_dashboard_dialect_options_are_the_only_accepted_codes(plan):
 async def test_mock_composer_is_fixture_only_and_preserves_facts(plan):
     request = request_from(plan)
     result = await MockDialectComposer().compose(request)
-    assert result.patient_alias == "أبو محمد"
+    assert result.patient_alias == "محمد عبدالله السالم"
     assert result.copied_facts == request.clinical_facts
 
     wrong = request.model_copy(update={"case_id": "other"})

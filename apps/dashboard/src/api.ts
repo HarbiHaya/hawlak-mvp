@@ -51,6 +51,111 @@ export interface CaseTimeline {
   data: TimelineEntry[];
 }
 
+export type WorkspaceReviewStatus = "draft" | "approved";
+
+export interface WorkspaceCaseSummary {
+  caseId: string;
+  patientName: string;
+  languageCode: "ar" | "en";
+  reviewStatus: WorkspaceReviewStatus;
+  alertCount: number;
+}
+
+export interface DischargeVoiceNote {
+  enabled: boolean;
+  script: string;
+}
+
+export interface MedicationImage {
+  source: "catalog" | "patient_photo";
+  objectKey: string;
+  reviewStatus: "pending" | "approved" | "rejected";
+  ocrCandidate?: string | null;
+}
+
+export interface WorkspaceMedication {
+  medicationId: string;
+  displayName: string;
+  doseInstruction: string;
+  dispensed: boolean;
+  image: MedicationImage | null;
+  reminderEnabled: boolean;
+  reminderScript: string;
+}
+
+export interface CallQuestion {
+  id: string;
+  prompt: string;
+}
+
+export interface CallPlan {
+  enabled: boolean;
+  scheduledAfterHours: number;
+  openingScript: string;
+  questions: CallQuestion[];
+  completionScript: string;
+  transferScript: string;
+  transferTarget: string;
+  responderPhoneE164: string;
+}
+
+export interface DeliveryRun {
+  id: string;
+  kind: "discharge_voice_note" | "medication_reminder" | "follow_up_call";
+  status: string;
+  scheduledAt: string;
+}
+
+export interface WorkspaceCaseDetail extends WorkspaceCaseSummary {
+  preferredFormOfAddress: string | null;
+  dialectCode: DialectCode;
+  sourceDocument: { objectKey: string; filename: string };
+  dischargeVoiceNote: DischargeVoiceNote;
+  medications: WorkspaceMedication[];
+  callPlan: CallPlan;
+  approvedBy: string | null;
+  approvedAt: string | null;
+  deliveryRuns: DeliveryRun[];
+}
+
+export interface WorkspaceAlert {
+  id: string;
+  caseId: string;
+  type: string;
+  severity: string;
+  status: "open" | "resolved";
+  summary: string;
+  createdAt: string;
+}
+
+export interface CaregiverCase {
+  caseId: string;
+  patientName: string;
+  journeyStatus: WorkspaceReviewStatus;
+  medications: Array<{
+    medicationId: string;
+    displayName: string;
+    status: "scheduled" | "needs_support";
+  }>;
+  openAlertCount: number;
+  nextCallAt: string | null;
+}
+
+export interface ApprovalResult {
+  caseId: string;
+  reviewStatus: "approved";
+  deliveryRuns: DeliveryRun[];
+}
+
+export interface SubmitDischargePacket {
+  document: File;
+  patientFullName: string;
+  preferredAddress?: string;
+  phoneE164: string;
+  languageCode: "ar" | "en";
+  dialectCode: DialectCode;
+}
+
 export type ReviewOutcome =
   | "matched"
   | "mismatch_found"
@@ -93,7 +198,7 @@ export class HawlakApi {
 
   constructor(
     baseUrl: string,
-    private readonly token: string,
+    private readonly token: string = "",
     private readonly fetcher: Fetcher = globalThis.fetch.bind(globalThis),
   ) {
     this.baseUrl = baseUrl.replace(/\/$/, "");
@@ -132,6 +237,88 @@ export class HawlakApi {
 
   getCaseTimeline(caseId: string): Promise<CaseTimeline> {
     return this.request(`/internal/cases/${encodeURIComponent(caseId)}/timeline`);
+  }
+
+  listWorkspaceCases(): Promise<{ data: WorkspaceCaseSummary[] }> {
+    return this.request("/internal/workspace/cases");
+  }
+
+  getWorkspaceCase(caseId: string): Promise<WorkspaceCaseDetail> {
+    return this.request(`/internal/workspace/cases/${encodeURIComponent(caseId)}`);
+  }
+
+  async submitDischargePacket(
+    packet: SubmitDischargePacket,
+  ): Promise<{ caseId: string; reviewStatus: WorkspaceReviewStatus }> {
+    const runId = `${Date.now().toString(36)}${crypto.randomUUID().slice(0, 6)}`;
+    const caseId = `case_${runId}`;
+    const stored = await this.request<{ objectKey: string; filename: string }>(
+      "/internal/workspace/documents",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/pdf",
+          "X-Case-Id": caseId,
+          "X-Filename": packet.document.name,
+        },
+        body: packet.document,
+      },
+    );
+    return this.request("/internal/workspace/cases", {
+      method: "POST",
+      body: JSON.stringify({
+        caseId,
+        patientName: packet.patientFullName,
+        preferredFormOfAddress: packet.preferredAddress || null,
+        phoneE164: packet.phoneE164,
+        languageCode: packet.languageCode,
+        dialectCode: packet.dialectCode,
+        sourceDocument: stored,
+      }),
+    });
+  }
+
+  listWorkspaceAlerts(): Promise<{ data: WorkspaceAlert[] }> {
+    return this.request("/internal/workspace/alerts");
+  }
+
+  uploadMedicationImage(
+    caseId: string,
+    image: File,
+  ): Promise<{ objectKey: string; filename: string; contentType: string }> {
+    return this.request(
+      `/internal/workspace/cases/${encodeURIComponent(caseId)}/medication-images`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": image.type,
+          "X-Filename": image.name,
+        },
+        body: image,
+      },
+    );
+  }
+
+  updateWorkspaceContent(
+    caseId: string,
+    content: Pick<WorkspaceCaseDetail, "dischargeVoiceNote" | "medications" | "callPlan">,
+  ): Promise<{ caseId: string; reviewStatus: WorkspaceReviewStatus }> {
+    return this.request(`/internal/workspace/cases/${encodeURIComponent(caseId)}/content`, {
+      method: "PATCH",
+      body: JSON.stringify(content),
+    });
+  }
+
+  approveWorkspaceCase(caseId: string, approvedBy: string, idempotencyKey: string): Promise<ApprovalResult> {
+    return this.request(`/internal/workspace/cases/${encodeURIComponent(caseId)}/approve`, {
+      method: "POST",
+      headers: { "Idempotency-Key": idempotencyKey },
+      body: JSON.stringify({ approvedBy }),
+    });
+  }
+
+  getCaregiverCase(caseId: string): Promise<CaregiverCase> {
+    return this.request(`/internal/caregiver/cases/${encodeURIComponent(caseId)}`);
   }
 
   approveAudioFirst(
@@ -212,9 +399,13 @@ export class HawlakApi {
   }
 
   private async request<T>(path: string, init: RequestInit = {}): Promise<T> {
+    const headers = this.headers(init.headers);
+    if (init.body instanceof FormData) {
+      headers.delete("Content-Type");
+    }
     const response = await this.fetcher(`${this.baseUrl}${path}`, {
       ...init,
-      headers: this.headers(init.headers),
+      headers,
     });
     if (!response.ok) {
       throw await this.errorFrom(response);
@@ -224,7 +415,7 @@ export class HawlakApi {
 
   private headers(extra: HeadersInit = {}): Headers {
     const headers = new Headers(extra);
-    headers.set("Authorization", `Bearer ${this.token}`);
+    if (this.token) headers.set("Authorization", `Bearer ${this.token}`);
     headers.set("Accept", "application/json");
     if (!headers.has("Content-Type")) {
       headers.set("Content-Type", "application/json");

@@ -48,7 +48,7 @@ def fixtures_dir() -> Path:
 
 @pytest.fixture
 def plan() -> dict:
-    """The synthetic approved plan for the demo case (أبو محمد)."""
+    """The synthetic approved plan for the demo case."""
     return json.loads((FIXTURES / "approved-plan.abu-mohammed.json").read_text(encoding="utf-8"))
 
 

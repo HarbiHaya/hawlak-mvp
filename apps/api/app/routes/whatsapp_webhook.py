@@ -28,12 +28,23 @@ class Text(BaseModel):
     body: str | None = None
 
 
+class ButtonReply(BaseModel):
+    id: str | None = None
+    title: str | None = None
+
+
+class Interactive(BaseModel):
+    type: str | None = None
+    button_reply: ButtonReply | None = None
+
+
 class Message(BaseModel):
     id: str | None = None
     sender: str = Field("", alias="from")
     type: str | None = None
     image: Image | None = None
     text: Text | None = None
+    interactive: Interactive | None = None
 
 
 class StatusError(BaseModel):
@@ -112,12 +123,14 @@ async def receive_webhook(
         for change in entry.changes:
             value = change.value or ChangeValue()
             for message in value.messages:
+                button_reply = message.interactive.button_reply if message.interactive else None
+                message_type = "button" if button_reply and button_reply.id else message.type
                 logger.info(
                     "WhatsApp inbound message accepted wa_message_id=%s sender_suffix=%s "
                     "message_type=%s media_id=%s",
                     message.id,
                     message.sender[-4:],
-                    message.type,
+                    message_type,
                     message.image.id if message.image else None,
                 )
                 if message.id:
@@ -125,10 +138,17 @@ async def receive_webhook(
                         await workflow.ingest_message(
                             wa_message_id=message.id,
                             sender=message.sender,
-                            message_type=message.type or "unknown",
+                            message_type=message_type or "unknown",
                             media_id=message.image.id if message.image else None,
                             mime_type=message.image.mime_type if message.image else None,
-                            text=message.text.body if message.text else None,
+                            text=(
+                                button_reply.title
+                                if button_reply
+                                else message.text.body
+                                if message.text
+                                else None
+                            ),
+                            button_payload=button_reply.id if button_reply else None,
                         )
                     except InboundPersistenceError:
                         return JSONResponse(

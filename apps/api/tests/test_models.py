@@ -16,7 +16,7 @@ from app.models import (
 def add_case(db_session, *, case_id: str = "case_01") -> PatientCase:
     case = PatientCase(
         id=case_id,
-        patient_alias="أبو محمد",
+        patient_alias="محمد عبدالله السالم",
         phone_e164="+966500000000",
         dialect_code="ar-SA-najdi",
         expected_box_count=3,

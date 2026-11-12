@@ -66,10 +66,20 @@ class WhatsAppClient:
         return _message_id(body)
 
     async def upload_audio(self, audio: bytes, filename: str) -> str:
+        return await self._upload_media(audio, filename, "audio/ogg")
+
+    async def upload_image(self, image: bytes, filename: str, content_type: str) -> str:
+        if content_type not in ALLOWED_IMAGE_MIME_TYPES:
+            raise MetaMediaPermanentError("Meta upload is not an allowed image")
+        if not image or len(image) > MAX_IMAGE_BYTES:
+            raise MetaMediaPermanentError("Meta upload image size is invalid")
+        return await self._upload_media(image, filename, content_type)
+
+    async def _upload_media(self, content: bytes, filename: str, content_type: str) -> str:
         body = await self._post(
             "media",
-            data={"messaging_product": "whatsapp", "type": "audio/ogg"},
-            files={"file": (filename, audio, "audio/ogg")},
+            data={"messaging_product": "whatsapp", "type": content_type},
+            files={"file": (filename, content, content_type)},
         )
         if not body.get("id"):
             raise MetaApiError("Meta accepted the media upload without returning a media ID")
@@ -77,6 +87,21 @@ class WhatsAppClient:
 
     async def send_audio(self, to: str, media_id: str) -> str:
         body = await self._post("messages", json=_message(to, "audio", {"id": media_id}))
+        return _message_id(body)
+
+    async def send_photo_reminder(self, to: str, media_id: str) -> str:
+        interactive = {
+            "type": "button",
+            "header": {"type": "image", "image": {"id": media_id}},
+            "body": {"text": "اضغط 1 إذا أخذت الجرعة، أو 2 إذا لم تأخذها بعد."},
+            "action": {
+                "buttons": [
+                    {"type": "reply", "reply": {"id": "taken", "title": "1"}},
+                    {"type": "reply", "reply": {"id": "not_yet", "title": "2"}},
+                ]
+            },
+        }
+        body = await self._post("messages", json=_message(to, "interactive", interactive))
         return _message_id(body)
 
     async def download_image(self, media_id: str) -> DownloadedMedia:
@@ -155,7 +180,7 @@ def _message(to: str, kind: str, content: dict) -> dict:
     return {
         "messaging_product": "whatsapp",
         "recipient_type": "individual",
-        "to": to,
+        "to": to.removeprefix("+"),
         "type": kind,
         kind: content,
     }

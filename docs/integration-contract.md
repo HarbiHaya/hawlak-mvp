@@ -33,7 +33,7 @@ The response is exactly:
       "occurredAt": "2026-10-25T12:00:00Z",
       "case": {
         "caseId": "case_01",
-        "patientAlias": "أبو محمد",
+        "patientAlias": "محمد عبدالله السالم",
         "phoneE164Masked": "+9665*****123",
         "expectedBoxCount": 3,
         "receivedBoxCount": 3

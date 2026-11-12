@@ -14,7 +14,7 @@ class FakeReadStorage:
 def seed_review_event(db_session):
     case = PatientCase(
         id="case_01",
-        patient_alias="أبو محمد",
+        patient_alias="محمد عبدالله السالم",
         phone_e164="+966500000000",
         dialect_code="ar-SA-najdi",
         expected_box_count=1,
@@ -47,7 +47,7 @@ def seed_review_event(db_session):
         "occurredAt": datetime.now(UTC).isoformat(),
         "case": {
             "caseId": "case_01",
-            "patientAlias": "أبو محمد",
+            "patientAlias": "محمد عبدالله السالم",
             "phoneE164Masked": "+9665*****000",
             "expectedBoxCount": 1,
             "receivedBoxCount": 1,

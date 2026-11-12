@@ -127,3 +127,27 @@ def test_logs_a_delivery_status(client, sign, caplog):
     assert "delivery_status=failed" in caplog.text
     assert "error_code=131026" in caplog.text
     assert "error_title=Message undeliverable" in caplog.text
+
+
+def test_accepts_an_interactive_medication_reply_as_a_button(client, sign, caplog):
+    body = webhook_body(
+        {
+            "messages": [
+                {
+                    "id": "wamid.REPLY1",
+                    "from": "966500001234",
+                    "type": "interactive",
+                    "interactive": {
+                        "type": "button_reply",
+                        "button_reply": {"id": "taken", "title": "1"},
+                    },
+                }
+            ]
+        }
+    )
+
+    with caplog.at_level(logging.INFO):
+        response = post_webhook(client, body, sign(body))
+
+    assert response.status_code == 200
+    assert "message_type=button" in caplog.text

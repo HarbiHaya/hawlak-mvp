@@ -70,7 +70,7 @@ registered sender, but its shared number always shows Twilio branding. A Hawlak
 profile name, photo and dedicated number require Twilio WhatsApp Self Sign-up.
 The prepared profile image is
 `docs/design-system/assets/hawlak-whatsapp-profile.png`, and the repeatable human
-setup is `scripts/setup_twilio_sender.sh`.
+setup is `scripts/setup_live_demo.sh`.
 
 ## Demo acceptance criteria
 

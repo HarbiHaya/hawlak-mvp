@@ -30,7 +30,7 @@ class ExactDashboardCORSMiddleware(CORSMiddleware):
         super().__init__(
             app,
             allow_origins=[],
-            allow_methods=["GET", "POST", "OPTIONS"],
+            allow_methods=["GET", "POST", "PATCH", "OPTIONS"],
             allow_headers=["Authorization", "Content-Type", "Idempotency-Key"],
             allow_credentials=False,
         )

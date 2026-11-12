@@ -6,7 +6,7 @@ from hashlib import sha256
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Alert, CareJourney, DeliveryRun, PatientCase, utc_now
+from app.models import Alert, CareJourney, DeliveryRun, PatientCase, WorkflowEvent, utc_now
 from app.schemas.care_journey import (
     CareJourneyContent,
     CareJourneyCreate,
@@ -265,6 +265,7 @@ class CareJourneyService:
     def record_call_outcome(
         self,
         run_id: str,
+        idempotency_key: str,
         status: str,
         provider_ref: str | None,
         escalation: dict | None,
@@ -274,6 +275,39 @@ class CareJourneyService:
             raise JourneyNotFound(run_id)
         if run.kind != "follow_up_call":
             raise JourneyConflict("delivery_run_is_not_call")
+
+        event_payload = {
+            "runId": run_id,
+            "status": status,
+            "providerRef": provider_ref,
+            "escalation": escalation,
+        }
+        event_for_key = self.session.scalar(
+            select(WorkflowEvent).where(WorkflowEvent.idempotency_key == idempotency_key)
+        )
+        if event_for_key is not None:
+            if (
+                event_for_key.event_type == "call_outcome"
+                and event_for_key.payload == event_payload
+            ):
+                return run
+            raise JourneyConflict("idempotency_key_conflict")
+
+        prior_outcome = next(
+            (
+                event
+                for event in self.session.scalars(
+                    select(WorkflowEvent).where(
+                        WorkflowEvent.case_id == run.case_id,
+                        WorkflowEvent.event_type == "call_outcome",
+                    )
+                )
+                if event.payload.get("runId") == run_id
+            ),
+            None,
+        )
+        if prior_outcome is not None:
+            raise JourneyConflict("call_outcome_already_recorded")
 
         if status == "transferred":
             journey = self.session.get(CareJourney, run.case_id)
@@ -310,6 +344,15 @@ class CareJourneyService:
         run.status = status
         if provider_ref is not None:
             run.provider_ref = provider_ref
+        self.session.add(
+            WorkflowEvent(
+                case_id=run.case_id,
+                event_type="call_outcome",
+                event_version=1,
+                payload=event_payload,
+                idempotency_key=idempotency_key,
+            )
+        )
         self.session.commit()
         return run
 
@@ -339,8 +382,13 @@ class CareJourneyService:
                 select(func.count(Alert.id)).where(Alert.case_id == case_id, Alert.status == "open")
             )
             or 0,
-            "nextCallAt": next(
-                (run.scheduled_at for run in runs if run.kind == "follow_up_call"), None
+            "nextCallAt": min(
+                (
+                    run.scheduled_at
+                    for run in runs
+                    if run.kind == "follow_up_call" and run.status in {"pending", "claimed", "sent"}
+                ),
+                default=None,
             ),
         }
 

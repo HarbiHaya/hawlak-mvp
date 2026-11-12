@@ -212,13 +212,14 @@ def record_call_outcome(
     run_id: str,
     body: CallOutcomeRequest,
     session: SessionDep,
-    _: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=256)],
+    idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=256)],
 ):
     service = CareJourneyService(session)
     escalation = body.escalation.model_dump(mode="json", by_alias=True) if body.escalation else None
     try:
         run = service.record_call_outcome(
             run_id,
+            idempotency_key,
             body.status,
             body.provider_ref,
             escalation,

@@ -1,16 +1,16 @@
-from app.models import Alert
+from app.models import Alert, WorkflowEvent
 
 
-def approved_runs(client, internal_auth_headers) -> list[dict]:
+def approved_runs(client, internal_auth_headers, case_id: str = "case_call_outcome") -> list[dict]:
     body = {
-        "caseId": "case_call_outcome",
+        "caseId": case_id,
         "patientName": "سارة أحمد التجريبية",
         "preferredFormOfAddress": "أم أحمد",
         "phoneE164": "+966500000000",
         "languageCode": "ar",
         "dialectCode": "ar-SA-najdi",
         "sourceDocument": {
-            "objectKey": "synthetic/discharges/call-outcome.pdf",
+            "objectKey": f"synthetic/discharges/{case_id}.pdf",
             "filename": "synthetic-discharge.pdf",
         },
         "dischargeVoiceNote": {
@@ -45,9 +45,9 @@ def approved_runs(client, internal_auth_headers) -> list[dict]:
     }
     client.post("/internal/workspace/cases", json=body, headers=internal_auth_headers)
     response = client.post(
-        "/internal/workspace/cases/case_call_outcome/approve",
+        f"/internal/workspace/cases/{case_id}/approve",
         json={"approvedBy": "SYN-INTEGRATED-CARE-CALL"},
-        headers={**internal_auth_headers, "Idempotency-Key": "approve-call-outcome"},
+        headers={**internal_auth_headers, "Idempotency-Key": f"approve-{case_id}"},
     )
     return response.json()["deliveryRuns"]
 
@@ -92,6 +92,11 @@ def test_transferred_call_outcome_is_idempotent_and_opens_one_minimized_alert(
     assert first.json() == replay.json()
     assert first.json()["status"] == "transferred"
     assert db_session.query(Alert).count() == 1
+    assert db_session.query(WorkflowEvent).count() == 1
+    event = db_session.query(WorkflowEvent).one()
+    assert event.event_type == "call_outcome"
+    assert event.idempotency_key == "call-outcome-transfer-01"
+    assert event.payload == {"runId": call_run["id"], **payload}
     alert = db_session.query(Alert).one()
     assert alert.type == "call_escalation"
     assert alert.status == "open"
@@ -102,6 +107,7 @@ def test_transferred_call_outcome_is_idempotent_and_opens_one_minimized_alert(
         "/internal/caregiver/cases/case_call_outcome", headers=internal_auth_headers
     )
     assert caregiver.json()["openAlertCount"] == 1
+    assert caregiver.json()["nextCallAt"] is None
 
 
 def test_completed_call_outcome_is_idempotent_without_alert(
@@ -128,6 +134,101 @@ def test_completed_call_outcome_is_idempotent_without_alert(
     assert first.json() == replay.json()
     assert first.json()["status"] == "completed"
     assert db_session.query(Alert).count() == 0
+    assert db_session.query(WorkflowEvent).count() == 1
+    caregiver = client.get(
+        "/internal/caregiver/cases/case_call_outcome", headers=internal_auth_headers
+    )
+    assert caregiver.json()["nextCallAt"] is None
+
+
+def test_call_outcome_rejects_conflicting_replays_without_duplicate_events_or_alerts(
+    client, internal_auth_headers, db_session
+):
+    runs = approved_runs(client, internal_auth_headers)
+    call_run = next(run for run in runs if run["kind"] == "follow_up_call")
+    mark_sent(client, internal_auth_headers, call_run["id"])
+    url = f"/internal/delivery-runs/{call_run['id']}/call-outcome"
+    original = {
+        "status": "transferred",
+        "providerRef": "synthetic-transfer",
+        "escalation": {"questionId": "red-flag", "answerKind": "uncertain"},
+    }
+    first = client.post(
+        url,
+        json=original,
+        headers={**internal_auth_headers, "Idempotency-Key": "stable-call-outcome-key"},
+    )
+
+    changed_payload = client.post(
+        url,
+        json={
+            **original,
+            "escalation": {"questionId": "red-flag", "answerKind": "red_flag"},
+        },
+        headers={**internal_auth_headers, "Idempotency-Key": "stable-call-outcome-key"},
+    )
+    changed_key = client.post(
+        url,
+        json=original,
+        headers={**internal_auth_headers, "Idempotency-Key": "different-call-outcome-key"},
+    )
+
+    assert first.status_code == 200
+    assert changed_payload.status_code == 409
+    assert changed_payload.json() == {"error": "idempotency_key_conflict"}
+    assert changed_key.status_code == 409
+    assert changed_key.json() == {"error": "call_outcome_already_recorded"}
+    assert db_session.query(WorkflowEvent).count() == 1
+    assert db_session.query(Alert).count() == 1
+
+
+def test_call_outcome_idempotency_key_cannot_be_reused_for_another_run(
+    client, internal_auth_headers, db_session
+):
+    first_runs = approved_runs(client, internal_auth_headers, "case_call_outcome_a")
+    second_runs = approved_runs(client, internal_auth_headers, "case_call_outcome_b")
+    first_call = next(run for run in first_runs if run["kind"] == "follow_up_call")
+    second_call = next(run for run in second_runs if run["kind"] == "follow_up_call")
+    mark_sent(client, internal_auth_headers, first_call["id"])
+    mark_sent(client, internal_auth_headers, second_call["id"])
+    headers = {**internal_auth_headers, "Idempotency-Key": "shared-call-outcome-key"}
+
+    first = client.post(
+        f"/internal/delivery-runs/{first_call['id']}/call-outcome",
+        json={"status": "completed"},
+        headers=headers,
+    )
+    reused = client.post(
+        f"/internal/delivery-runs/{second_call['id']}/call-outcome",
+        json={"status": "completed"},
+        headers=headers,
+    )
+
+    assert first.status_code == 200
+    assert reused.status_code == 409
+    assert reused.json() == {"error": "idempotency_key_conflict"}
+    assert db_session.query(WorkflowEvent).count() == 1
+
+
+def test_caregiver_next_call_ignores_a_failed_call_run(client, internal_auth_headers):
+    runs = approved_runs(client, internal_auth_headers)
+    call_run = next(run for run in runs if run["kind"] == "follow_up_call")
+    client.post(
+        f"/internal/delivery-runs/{call_run['id']}/claim",
+        headers={**internal_auth_headers, "Idempotency-Key": "claim-failed-call"},
+    )
+    failed = client.patch(
+        f"/internal/delivery-runs/{call_run['id']}",
+        json={"status": "failed", "providerRef": "synthetic-call-failure"},
+        headers=internal_auth_headers,
+    )
+
+    caregiver = client.get(
+        "/internal/caregiver/cases/case_call_outcome", headers=internal_auth_headers
+    )
+
+    assert failed.status_code == 200
+    assert caregiver.json()["nextCallAt"] is None
 
 
 def test_call_outcome_rejects_non_call_run_and_invalid_transition(client, internal_auth_headers):

@@ -7,6 +7,7 @@ from app.db import SessionDep
 from app.models import CareJourney
 from app.schemas.care_journey import (
     ApprovalRequest,
+    CallOutcomeRequest,
     CareJourneyContent,
     CareJourneyCreate,
     DeliveryRunUpdate,
@@ -204,3 +205,24 @@ def update_delivery_run(run_id: str, body: DeliveryRunUpdate, session: SessionDe
         return service.run_view(service.update_run(run_id, body.status, body.provider_ref))
     except (JourneyNotFound, JourneyConflict) as exc:
         return error_response(exc)
+
+
+@router.post("/delivery-runs/{run_id}/call-outcome")
+def record_call_outcome(
+    run_id: str,
+    body: CallOutcomeRequest,
+    session: SessionDep,
+    _: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=256)],
+):
+    service = CareJourneyService(session)
+    escalation = body.escalation.model_dump(mode="json", by_alias=True) if body.escalation else None
+    try:
+        run = service.record_call_outcome(
+            run_id,
+            body.status,
+            body.provider_ref,
+            escalation,
+        )
+    except (JourneyNotFound, JourneyConflict) as exc:
+        return error_response(exc)
+    return service.run_view(run)

@@ -262,6 +262,57 @@ class CareJourneyService:
         self.session.commit()
         return run
 
+    def record_call_outcome(
+        self,
+        run_id: str,
+        status: str,
+        provider_ref: str | None,
+        escalation: dict | None,
+    ) -> DeliveryRun:
+        run = self.session.get(DeliveryRun, run_id)
+        if run is None:
+            raise JourneyNotFound(run_id)
+        if run.kind != "follow_up_call":
+            raise JourneyConflict("delivery_run_is_not_call")
+
+        if status == "transferred":
+            journey = self.session.get(CareJourney, run.case_id)
+            approved_question_ids = {
+                question["id"]
+                for question in (journey.call_plan.get("questions", []) if journey else [])
+            }
+            question_id = escalation["questionId"] if escalation else ""
+            if question_id not in approved_question_ids:
+                raise JourneyConflict("call_question_not_approved")
+
+        if run.status == status:
+            return run
+        if run.status != "sent":
+            raise JourneyConflict("call_run_not_sent")
+
+        if status == "transferred":
+            answer_kind = escalation["answerKind"]
+            alert_key = f"{run.id}:call_escalation"
+            alert = self.session.scalar(select(Alert).where(Alert.idempotency_key == alert_key))
+            if alert is None:
+                self.session.add(
+                    Alert(
+                        case_id=run.case_id,
+                        type="call_escalation",
+                        severity="high",
+                        summary=(
+                            f"Call escalation: {answer_kind} at approved question {question_id}"
+                        ),
+                        idempotency_key=alert_key,
+                    )
+                )
+
+        run.status = status
+        if provider_ref is not None:
+            run.provider_ref = provider_ref
+        self.session.commit()
+        return run
+
     def caregiver(self, case_id: str) -> dict:
         journey, patient = self._get(case_id)
         runs = self._runs(case_id)

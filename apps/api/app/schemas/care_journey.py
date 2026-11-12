@@ -95,6 +95,25 @@ class DeliveryRunUpdate(CamelModel):
     provider_ref: str | None = Field(default=None, max_length=256)
 
 
+class CallEscalation(CamelModel):
+    question_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
+    answer_kind: Literal["red_flag", "uncertain", "transfer_request"]
+
+
+class CallOutcomeRequest(CamelModel):
+    status: Literal["completed", "transferred"]
+    provider_ref: str | None = Field(default=None, max_length=256)
+    escalation: CallEscalation | None = None
+
+    @model_validator(mode="after")
+    def validate_escalation(self):
+        if self.status == "transferred" and self.escalation is None:
+            raise ValueError("a transferred call requires an escalation")
+        if self.status == "completed" and self.escalation is not None:
+            raise ValueError("a completed call cannot include an escalation")
+        return self
+
+
 class CallPlanView(CamelModel):
     id: str
     case_id: str

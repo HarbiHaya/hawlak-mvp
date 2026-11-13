@@ -5,7 +5,7 @@ import { Icon } from "../Icon";
 import { formatDate, formatDateTime, formatShort, pick, type Locale } from "../i18n";
 import { dispatchSummary } from "../readiness";
 import { Badge, EmptyState, Field, Notice, Segmented } from "../ui";
-import { coverageLabel, dialectLabel, languageLabel, repeatLabel, runKindIcon, runKindLabel, runStatusLabel, runStatusTone, t as texts } from "./text";
+import { coverageLabel, dialectLabel, languageLabel, photoCheckLabel, repeatLabel, runKindIcon, runKindLabel, runStatusLabel, runStatusTone, t as texts } from "./text";
 
 type Origin = "generated" | "edited" | "manual";
 const originOf = (current: string, generated: string | undefined): Origin => generated === undefined ? "manual" : current.trim() === generated.trim() ? "generated" : "edited";
@@ -204,10 +204,9 @@ function CallSchedule({ plan, locale, onChange }: { plan: CallPlan; locale: Loca
 
 /* ---------- Medications ---------- */
 
-export function MedicationsTab({ api, detail, locale, onChange, onError }: { api: HawlakApi; detail: WorkspaceCaseDetail; locale: Locale; onChange: (next: WorkspaceCaseDetail) => void; onError: (error: unknown) => void }) {
+export function MedicationsTab({ api, detail, locale, onChange }: { api: HawlakApi; detail: WorkspaceCaseDetail; locale: Locale; onChange: (next: WorkspaceCaseDetail) => void }) {
   const t = texts[locale];
   const locked = detail.reviewStatus === "approved";
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [removed, setRemoved] = useState<{ item: WorkspaceMedication; index: number } | null>(null);
   useEffect(() => setRemoved(null), [detail.caseId]);
 
@@ -227,25 +226,18 @@ export function MedicationsTab({ api, detail, locale, onChange, onError }: { api
     onChange({ ...detail, medications });
     setRemoved(null);
   }
-  async function upload(medicationId: string, file: File) {
-    setUploadingId(medicationId);
-    try {
-      const stored = await api.uploadMedicationImage(detail.caseId, file);
-      update(medicationId, { image: { source: "catalog", objectKey: stored.objectKey, reviewStatus: "pending" } });
-    } catch (caught) { onError(caught); }
-    finally { setUploadingId(null); }
-  }
+  const patientPhoto = (medicationId: string) => [...(detail.medicinePhotos ?? [])].reverse().find((photo) => photo.medicationId === medicationId && photo.checkStatus !== "unreadable");
 
   return <div className="med-list">
     {removed && <Notice tone="neutral" icon="trash"><span style={{ display: "flex", gap: 12, alignItems: "center", justifyContent: "space-between" }}>{t.removed.replace("{name}", removed.item.displayName || t.unnamed)}<button type="button" className="button button--link" onClick={undo}>{t.undo}</button></span></Notice>}
     {detail.medications.length === 0 && <EmptyState compact icon="pill" title={t.noMedications} />}
     {detail.medications.map((item, index) => {
       const generatedReminder = detail.generatedDraft?.reminderScripts[item.medicationId];
-      const needsImage = item.dispensed && item.reminderEnabled && item.image?.reviewStatus !== "approved";
+      const photo = patientPhoto(item.medicationId);
       return <article className="med" key={item.medicationId} aria-label={item.displayName || t.unnamed}>
         <div className="med__image">
-          <MedicineImage api={api} caseId={detail.caseId} objectKey={item.image?.objectKey} alt={item.displayName} empty={t.noImage} />
-          {item.image ? <Badge tone={item.image.reviewStatus === "approved" ? "success" : item.image.reviewStatus === "pending" ? "warning" : "danger"} plain>{item.image.reviewStatus === "approved" ? t.imageApproved : item.image.reviewStatus === "pending" ? t.imagePending : t.imageRejected}</Badge> : needsImage && <Badge tone="warning" plain>{t.noImage}</Badge>}
+          <MedicineImage api={api} caseId={detail.caseId} objectKey={photo?.objectKey ?? item.image?.objectKey} alt={item.displayName} empty={t.noImage} />
+          {item.dispensed && <Badge tone={photo ? "info" : "neutral"} plain>{photo ? t.patientPhoto : t.photoAfterApproval}</Badge>}
         </div>
         <div className="med__fields">
           <Field label={t.medicationName}>{({ id }) => <input id={id} className="input" disabled={locked} value={item.displayName} onChange={(event) => update(item.medicationId, { displayName: event.target.value })} />}</Field>
@@ -257,8 +249,6 @@ export function MedicationsTab({ api, detail, locale, onChange, onError }: { api
           </div>
           {item.dispensed && item.reminderEnabled && <Field full label={t.reminder} aside={<OriginTag origin={originOf(item.reminderScript, generatedReminder)} locale={locale} />}>{({ id }) => <input id={id} className="input" dir="auto" disabled={locked} value={item.reminderScript} onChange={(event) => update(item.medicationId, { reminderScript: event.target.value })} />}</Field>}
           {!locked && <div className="med__footer">
-            <label className="button button--sm file-button"><Icon name="upload" size={14} />{uploadingId === item.medicationId ? t.uploadingImage : item.image ? t.replaceImage : t.uploadImage}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingId !== null} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ""; if (file) void upload(item.medicationId, file); }} /></label>
-            {item.image?.reviewStatus === "pending" && <button type="button" className="button button--sm" onClick={() => update(item.medicationId, { image: { ...item.image!, reviewStatus: "approved" } })}><Icon name="check" size={14} />{t.approveImage}</button>}
             <button type="button" className="button button--sm button--ghost button--danger" onClick={() => remove(index)}><Icon name="trash" size={14} />{t.removeMedication}</button>
           </div>}
         </div>
@@ -266,6 +256,29 @@ export function MedicationsTab({ api, detail, locale, onChange, onError }: { api
     })}
     {!locked && <button type="button" className="button" style={{ justifySelf: "start" }} onClick={add}><Icon name="plus" size={16} />{t.addMedication}</button>}
   </div>;
+}
+
+export function PhotosTab({ api, detail, locale, busy, onReview }: { api: HawlakApi; detail: WorkspaceCaseDetail; locale: Locale; busy: boolean; onReview: (id: string, decision: "confirmed" | "follow_up") => void }) {
+  const t = texts[locale];
+  const photos = detail.medicinePhotos ?? [];
+  if (photos.length === 0) return <EmptyState compact icon="image" title={t.noPhotos} />;
+  const planned = (id: string | null) => detail.medications.find((item) => item.medicationId === id)?.displayName;
+  return <>
+    <Notice tone="info">{t.photosNote}</Notice>
+    <div className="photo-grid">{photos.map((photo) => <article className="photo-review" key={photo.id}>
+      <MedicineImage api={api} caseId={detail.caseId} objectKey={photo.objectKey ?? undefined} alt={photo.reading?.name ?? t.photos} empty={t.noImage} />
+      <dl className="photo-facts">
+        <div><dt>{t.sentBy}</dt><dd>{photo.sender === "caregiver" ? t.fromCaregiver : t.fromPatient} · {formatDate(photo.receivedAt, locale)}</dd></div>
+        <div><dt>{t.label}</dt><dd dir="auto">{photo.reading ? [photo.reading.name, photo.reading.strength, photo.reading.form].filter(Boolean).join(" · ") : t.notRead}</dd></div>
+        <div><dt>{t.planned}</dt><dd dir="auto">{planned(photo.medicationId) ?? "—"}</dd></div>
+        <div><dt>{t.photoStatus}</dt><dd><span className={`photo-state photo-state--${photo.checkStatus}`}>{photoCheckLabel[photo.checkStatus][locale]}</span></dd></div>
+      </dl>
+      <div className="photo-review__actions">{photo.reviewStatus
+        ? <span className={`photo-state photo-state--${photo.reviewStatus}`}>{photo.reviewStatus === "confirmed" ? t.confirmPhoto : t.followUp} · {t.reviewed.replace("{who}", photo.reviewedBy ?? "")}</span>
+        : <><button type="button" className="button button--sm" disabled={busy} onClick={() => onReview(photo.id, "follow_up")}>{t.followUp}</button><button type="button" className="button button--sm button--primary" disabled={busy} onClick={() => onReview(photo.id, "confirmed")}>{t.confirmPhoto}</button></>}
+      </div>
+    </article>)}</div>
+  </>;
 }
 
 function MedicineImage({ api, caseId, objectKey, alt, empty }: { api: HawlakApi; caseId: string; objectKey?: string; alt: string; empty: string }) {

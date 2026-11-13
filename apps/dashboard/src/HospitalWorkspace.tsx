@@ -11,6 +11,7 @@ const labels = {
     patient: "المريض", contact: "التواصل والتغطية", communication: "لغة التواصل", document: "ملخص الخروج",
     name: "الاسم الكامل كما هو مسجل", address: "صيغة المخاطبة", addressHint: "مثال: أبو محمد. تُستخدم في الرسائل الصوتية.", optional: "اختياري",
     phone: "رقم الجوال", phoneHint: "بالصيغة الدولية، مثل ‎+9665XXXXXXXX", phoneError: "أدخل الرقم بالصيغة الدولية مبدوءاً بـ +.",
+    caregiverPhone: "رقم جوال مقدم الرعاية", caregiverHint: "بموافقته. يستطيع إرسال صور علب الأدوية نيابةً عن المريض.", caregiverError: "أدخل رقماً دولياً مختلفاً عن رقم المريض، أو اترك الحقل فارغاً.",
     member: "رقم عضوية التأمين", memberHint: "كما في بطاقة التأمين", memberError: "من ٤ إلى ٣٢ حرفاً أو رقماً أو شرطة.",
     language: "اللغة", dialect: "اللهجة", nameError: "أدخل اسم المريض.",
     pick: "اسحب ملف PDF هنا أو اختر ملفاً", pickHint: "PDF بحد أقصى ٥ ميجابايت", change: "تغيير", fileError: "اختر ملف PDF لا يتجاوز ٥ ميجابايت.",
@@ -22,6 +23,7 @@ const labels = {
     patient: "Patient", contact: "Contact and coverage", communication: "Communication", document: "Discharge summary",
     name: "Full name, as registered", address: "Form of address", addressHint: "For example: Abu Mohammed. Used in voice messages.", optional: "optional",
     phone: "Mobile number", phoneHint: "International format, e.g. +9665XXXXXXXX", phoneError: "Enter the number in international format, starting with +.",
+    caregiverPhone: "Caregiver mobile number", caregiverHint: "With their consent. They can send medicine-box photos for the patient.", caregiverError: "Enter an international number different from the patient's, or leave it blank.",
     member: "Insurance member ID", memberHint: "As shown on the insurance card", memberError: "4–32 letters, digits or hyphens.",
     language: "Language", dialect: "Dialect", nameError: "Enter the patient's name.",
     pick: "Drop a PDF here or choose a file", pickHint: "PDF, up to 5 MB", change: "Change", fileError: "Choose a PDF file of up to 5 MB.",
@@ -45,6 +47,7 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
   const [patientName, setPatientName] = useState("");
   const [preferredAddress, setPreferredAddress] = useState("");
   const [phone, setPhone] = useState("");
+  const [caregiverPhone, setCaregiverPhone] = useState("");
   const [memberId, setMemberId] = useState("");
   const [language, setLanguage] = useState<"ar" | "en">("ar");
   const [dialect, setDialect] = useState<DialectCode>("ar-SA-najdi");
@@ -59,6 +62,7 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
   const errors = {
     name: patientName.trim() ? null : t.nameError,
     phone: /^\+[1-9]\d{7,14}$/.test(phone) ? null : t.phoneError,
+    caregiver: !caregiverPhone || (/^\+[1-9]\d{7,14}$/.test(caregiverPhone) && caregiverPhone !== phone) ? null : t.caregiverError,
     member: /^[A-Za-z0-9-]{4,32}$/.test(memberId) ? null : t.memberError,
     file: document && isPdf(document) && document.size <= MAX_PDF_BYTES ? null : t.fileError,
   };
@@ -79,7 +83,7 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    setTouched({ name: true, phone: true, member: true, file: true });
+    setTouched({ name: true, phone: true, caregiver: true, member: true, file: true });
     const firstInvalid = (Object.keys(errors) as Array<keyof typeof errors>).find((key) => errors[key]);
     if (firstInvalid || !document) {
       formRef.current?.querySelector<HTMLElement>(`[data-field="${firstInvalid}"]`)?.focus();
@@ -87,14 +91,14 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
     }
     setBusy(true); setError(null);
     try {
-      const result = await api.submitDischargePacket({ document, patientFullName: patientName.trim(), preferredAddress: preferredAddress.trim(), phoneE164: phone, memberId, languageCode: language, dialectCode: dialect });
+      const result = await api.submitDischargePacket({ document, patientFullName: patientName.trim(), preferredAddress: preferredAddress.trim(), phoneE164: phone, caregiverPhoneE164: caregiverPhone || undefined, memberId, languageCode: language, dialectCode: dialect });
       setCreated(result.caseId);
     } catch (caught) { setError(displayError(caught, locale)); }
     finally { setBusy(false); }
   }
 
   function reset() {
-    setPatientName(""); setPreferredAddress(""); setPhone(""); setMemberId(""); setDocument(null);
+    setPatientName(""); setPreferredAddress(""); setPhone(""); setCaregiverPhone(""); setMemberId(""); setDocument(null);
     setTouched({}); setError(null); setCreated(null);
   }
 
@@ -124,6 +128,7 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
         <h2>{t.contact}</h2>
         <div className="form-section__fields">
           <Field label={t.phone} hint={t.phoneHint} error={shown("phone")}>{({ id, describedBy, invalid }) => <input id={id} data-field="phone" className="input" dir="ltr" type="tel" inputMode="tel" autoComplete="off" value={phone} aria-describedby={describedBy} aria-invalid={invalid} aria-required="true" onBlur={() => touch("phone")} onChange={(event) => setPhone(event.target.value.replace(/[\s-]/g, ""))} placeholder="+9665XXXXXXXX" />}</Field>
+          <Field label={t.caregiverPhone} optional={t.optional} hint={t.caregiverHint} error={shown("caregiver")}>{({ id, describedBy, invalid }) => <input id={id} data-field="caregiver" className="input" dir="ltr" type="tel" inputMode="tel" autoComplete="off" value={caregiverPhone} aria-describedby={describedBy} aria-invalid={invalid} onBlur={() => touch("caregiver")} onChange={(event) => setCaregiverPhone(event.target.value.replace(/[\s-]/g, ""))} placeholder="+9665XXXXXXXX" />}</Field>
           <Field label={t.member} hint={t.memberHint} error={shown("member")}>{({ id, describedBy, invalid }) => <input id={id} data-field="member" className="input mono" dir="ltr" autoComplete="off" value={memberId} aria-describedby={describedBy} aria-invalid={invalid} aria-required="true" onBlur={() => touch("member")} onChange={(event) => setMemberId(event.target.value.trim().toUpperCase())} placeholder="SYN-4471203" />}</Field>
         </div>
       </section>

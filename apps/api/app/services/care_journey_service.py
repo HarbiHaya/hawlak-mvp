@@ -6,13 +6,22 @@ from hashlib import sha256
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.models import Alert, CareJourney, DeliveryRun, PatientCase, WorkflowEvent, utc_now
+from app.models import (
+    Alert,
+    CareJourney,
+    DeliveryRun,
+    InboundMedia,
+    PatientCase,
+    WorkflowEvent,
+    utc_now,
+)
 from app.schemas.care_journey import (
     CareJourneyContent,
     CareJourneyCreate,
 )
 from app.services.discharge_parser import DischargeExtraction, draft_medications
 from app.services.insurer_systems import MockInsurerSystems
+from app.services.medicine_photos import MISMATCH
 from app.services.patient_identifiers import find_identifier
 
 REPEAT_DAYS = {"none": 0, "daily": 1, "every_2_days": 2, "weekly": 7}
@@ -57,6 +66,7 @@ class CareJourneyService:
             id=body.case_id,
             patient_alias=body.patient_name,
             phone_e164=body.phone_e164,
+            caregiver_phone_e164=body.caregiver_phone_e164,
             dialect_code=body.dialect_code,
             expected_box_count=max(1, len(body.medications or [])),
             status="active",
@@ -126,6 +136,7 @@ class CareJourneyService:
             "approvedBy": journey.approved_by,
             "approvedAt": journey.approved_at,
             "deliveryRuns": [self.run_view(run) for run in runs],
+            "medicinePhotos": [self.photo_view(photo) for photo in self._photos(case_id)],
         }
 
     def replace_content(self, case_id: str, body: CareJourneyContent) -> CareJourney:
@@ -214,6 +225,9 @@ class CareJourneyService:
                         approved_at,
                     )
                 )
+        if any(medication["dispensed"] for medication in journey.medications):
+            # The patient photographs each approved box; see medicine_photos.
+            runs.append(self._run(case_id, "photo_request", "medicinePhotos", approved_at))
         if journey.call_plan["enabled"]:
             for index, scheduled_at in enumerate(self._call_times(journey.call_plan, approved_at)):
                 ref = "callPlan" if index == 0 else f"callPlan:{index + 1}"
@@ -423,9 +437,71 @@ class CareJourneyService:
         self.session.commit()
         return run
 
+    def review_photo(self, case_id: str, photo_id: str, decision: str, reviewed_by: str) -> dict:
+        """A person confirms the photo or keeps it for follow-up; confirming closes its alert."""
+        photo = self.session.get(InboundMedia, photo_id)
+        if photo is None or photo.case_id != case_id or photo.processing_status != "stored":
+            raise JourneyNotFound(photo_id)
+        photo.review_status = decision
+        photo.reviewed_by = reviewed_by
+        photo.reviewed_at = utc_now()
+        if decision == "confirmed":
+            alert = self.session.scalar(
+                select(Alert).where(
+                    Alert.idempotency_key == f"{case_id}:medicine_photo_mismatch:{photo_id}"
+                )
+            )
+            if alert is not None and alert.status == "open":
+                alert.status = "resolved"
+                alert.resolved_at = utc_now()
+        self.session.commit()
+        return self.photo_view(photo)
+
+    @staticmethod
+    def photo_view(photo: InboundMedia) -> dict:
+        return {
+            "id": photo.id,
+            "sender": photo.sender_role,
+            "receivedAt": photo.received_at,
+            "objectKey": photo.object_key,
+            "reading": (
+                {k: photo.label_reading[k] for k in ("name", "strength", "form")}
+                if photo.label_reading and photo.label_reading.get("readable", True)
+                else None
+            ),
+            "checkStatus": photo.check_status or "not_checked",
+            "medicationId": photo.medication_id,
+            "reviewStatus": photo.review_status,
+            "reviewedBy": photo.reviewed_by,
+            "reviewedAt": photo.reviewed_at,
+        }
+
+    def _photos(self, case_id: str) -> list[InboundMedia]:
+        return list(
+            self.session.scalars(
+                select(InboundMedia)
+                .where(InboundMedia.case_id == case_id, InboundMedia.processing_status == "stored")
+                .order_by(InboundMedia.received_at, InboundMedia.id)
+            )
+        )
+
+    @staticmethod
+    def _photo_status(photos: list[InboundMedia], medication_id: str) -> str:
+        """missing, received, needs_attention or confirmed, from the latest photo of a medicine."""
+        mine = [p for p in photos if p.medication_id == medication_id]
+        if not mine:
+            return "missing"
+        latest = mine[-1]
+        if latest.review_status == "confirmed":
+            return "confirmed"
+        if latest.review_status == "follow_up" or latest.check_status in MISMATCH:
+            return "needs_attention"
+        return "missing" if latest.check_status == "unreadable" else "received"
+
     def caregiver(self, case_id: str) -> dict:
         journey, patient = self._get(case_id)
         runs = self._runs(case_id)
+        photos = self._photos(case_id)
         reminder_ids = {
             run.content_ref.split(":", 1)[1] for run in runs if run.kind == "medication_reminder"
         }
@@ -442,6 +518,7 @@ class CareJourneyService:
                         if medication["medicationId"] in reminder_ids
                         else "needs_support"
                     ),
+                    "photoStatus": self._photo_status(photos, medication["medicationId"]),
                 }
                 for medication in journey.medications
             ],
@@ -499,9 +576,6 @@ class CareJourneyService:
             if medication["dispensed"] and medication["reminderEnabled"]:
                 if not medication["reminderScript"].strip():
                     return "reminder_script_required"
-                image = medication.get("image")
-                if not image or image.get("reviewStatus") != "approved":
-                    return "medication_image_requires_review"
         if voice.get("enabled") and not voice.get("script", "").strip():
             return "voice_script_required"
         if call.get("enabled"):
@@ -614,6 +688,7 @@ class CareJourneyService:
         return (
             patient.patient_alias == body.patient_name
             and patient.phone_e164 == body.phone_e164
+            and patient.caregiver_phone_e164 == body.caregiver_phone_e164
             and patient.dialect_code == body.dialect_code
             and journey.preferred_form_of_address == body.preferred_form_of_address
             and journey.language_code == body.language_code

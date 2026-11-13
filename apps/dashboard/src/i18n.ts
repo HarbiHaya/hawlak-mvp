@@ -14,7 +14,6 @@ const errorMessages: Record<string, Bilingual> = {
   medications_required: { ar: "أضف دواءً واحداً على الأقل.", en: "Add at least one medication." },
   medication_details_required: { ar: "أكمل اسم الدواء والجرعة لجميع الأدوية.", en: "Complete the name and dose for every medication." },
   reminder_script_required: { ar: "أدخل نص التذكير لكل دواء مفعّل له التذكير.", en: "Enter the reminder text for every medication with a reminder." },
-  medication_image_requires_review: { ar: "ارفع صورة العبوة واعتمدها لكل دواء مفعّل له التذكير.", en: "Upload and approve a package image for every medication with a reminder." },
   voice_script_required: { ar: "أدخل نص الرسالة الصوتية أو أوقف إرسالها.", en: "Enter the voice message text or turn the voice message off." },
   call_plan_incomplete: { ar: "أكمل نصوص مكالمة المتابعة ورقم فريق الاستجابة، أو أوقف المكالمة.", en: "Complete the follow-up call texts and responder number, or turn the call off." },
   call_time_in_past: { ar: "موعد المكالمة الأولى في الماضي.", en: "The first call is scheduled in the past." },

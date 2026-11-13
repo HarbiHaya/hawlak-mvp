@@ -87,6 +87,7 @@ def test_hospital_intake_to_approved_mock_delivery_preserves_exact_content(
     assert [run["kind"] for run in dispatch.json()["data"]] == [
         "discharge_voice_note",
         "medication_reminder",
+        "photo_request",
     ]
     assert all(run["status"] == "sent" for run in dispatch.json()["data"])
 
@@ -98,6 +99,7 @@ def test_hospital_intake_to_approved_mock_delivery_preserves_exact_content(
     assert {run["kind"]: run["status"] for run in approved["deliveryRuns"]} == {
         "discharge_voice_note": "sent",
         "medication_reminder": "sent",
+        "photo_request": "sent",
         "follow_up_call": "pending",
     }
 

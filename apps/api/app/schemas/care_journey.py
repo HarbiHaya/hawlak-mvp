@@ -72,6 +72,8 @@ class CareJourneyCreate(CamelModel):
     patient_name: str = Field(min_length=2, max_length=200)
     preferred_form_of_address: str | None = Field(default=None, max_length=200)
     phone_e164: str = Field(pattern=r"^\+[1-9]\d{7,14}$")
+    # Registered with the caregiver's consent; this number may send medicine photos.
+    caregiver_phone_e164: str | None = Field(default=None, pattern=r"^\+[1-9]\d{7,14}$")
     member_id: str | None = Field(default=None, pattern=MEMBER_ID)
     language_code: Literal["ar", "en"]
     dialect_code: DialectCode
@@ -79,6 +81,12 @@ class CareJourneyCreate(CamelModel):
     discharge_voice_note: DischargeVoiceNote | None = None
     medications: list[JourneyMedication] | None = Field(default=None, max_length=20)
     call_plan: CallPlan | None = None
+
+    @model_validator(mode="after")
+    def validate_caregiver(self):
+        if self.caregiver_phone_e164 and self.caregiver_phone_e164 == self.phone_e164:
+            raise ValueError("the caregiver phone must differ from the patient phone")
+        return self
 
 
 class CareJourneyContent(CamelModel):
@@ -105,6 +113,11 @@ class DeliveryRunView(CamelModel):
 class DeliveryRunUpdate(CamelModel):
     status: Literal["sent", "completed", "failed", "transferred"]
     provider_ref: str | None = Field(default=None, max_length=256)
+
+
+class PhotoReviewRequest(CamelModel):
+    decision: Literal["confirmed", "follow_up"]
+    reviewed_by: str = Field(min_length=1, max_length=200)
 
 
 class CallEscalation(CamelModel):

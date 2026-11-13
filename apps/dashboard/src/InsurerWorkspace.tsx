@@ -4,7 +4,7 @@ import { ALERTS_CHANGED } from "./events";
 import { Icon } from "./Icon";
 import { AlertsView } from "./insurer/AlertsView";
 import { CaseQueue, type QueueFilter } from "./insurer/CaseQueue";
-import { ContentTab, CoverageTab, DeliveryTab, MedicationsTab, SourceTab } from "./insurer/tabs";
+import { ContentTab, CoverageTab, DeliveryTab, MedicationsTab, PhotosTab, SourceTab } from "./insurer/tabs";
 import { coverageLabel, dialectLabel, languageLabel, t as texts, type CaseTab } from "./insurer/text";
 import { HawlakApiError, type HawlakApi, type WorkspaceCaseDetail, type WorkspaceCaseSummary } from "./api";
 import { displayError, formatDateTime, formatNumber, formatShort, pick, type Locale } from "./i18n";
@@ -39,7 +39,7 @@ function CasesView({ api, locale, reviewer }: { api: HawlakApi; locale: Locale; 
   const [saved, setSaved] = useState("");
   const [tab, setTab] = useState<CaseTab>("source");
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [action, setAction] = useState<"save" | "approve" | "draft" | "eligibility" | null>(null);
+  const [action, setAction] = useState<"save" | "approve" | "draft" | "eligibility" | "photo" | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<"approve" | "regenerate" | null>(null);
 
@@ -175,6 +175,19 @@ function CasesView({ api, locale, reviewer }: { api: HawlakApi; locale: Locale; 
     finally { setAction(null); }
   }
 
+  async function reviewPhoto(photoId: string, decision: "confirmed" | "follow_up") {
+    if (!detail) return;
+    setAction("photo");
+    try {
+      await api.reviewMedicinePhoto(detail.caseId, photoId, decision, reviewer);
+      applyDetail(await api.getWorkspaceCase(detail.caseId));
+      void refreshList();
+      window.dispatchEvent(new Event(ALERTS_CHANGED));
+      notify(t.photoReviewed);
+    } catch (caught) { fail(caught); }
+    finally { setAction(null); }
+  }
+
   const ready = useMemo(() => (detail ? readiness(detail) : null), [detail]);
   const locked = detail?.reviewStatus === "approved";
   const busy = action !== null;
@@ -186,6 +199,7 @@ function CasesView({ api, locale, reviewer }: { api: HawlakApi; locale: Locale; 
     { id: "coverage" as const, label: t.coverage, state: locked || !ready ? undefined : ready.areas.coverage ? "todo" as const : "done" as const },
     { id: "medications" as const, label: t.medications, state: locked || !ready ? undefined : ready.areas.medications ? "todo" as const : "done" as const },
     { id: "content" as const, label: t.content, state: locked || !ready ? undefined : ready.areas.content ? "todo" as const : "done" as const },
+    { id: "photos" as const, label: detail?.medicinePhotos?.length ? `${t.photos} (${formatNumber(detail.medicinePhotos.length, locale)})` : t.photos },
     { id: "journey" as const, label: t.journey },
   ];
 
@@ -225,8 +239,9 @@ function CasesView({ api, locale, reviewer }: { api: HawlakApi; locale: Locale; 
           <div className="case__body" role="tabpanel" id="case-panel" aria-labelledby={`case-tab-${tab}`}>
             {tab === "source" && <SourceTab api={api} detail={detail} locale={locale} />}
             {tab === "coverage" && <CoverageTab detail={detail} locale={locale} busy={action === "eligibility"} onCheck={(memberId) => void checkEligibility(memberId)} />}
-            {tab === "medications" && <MedicationsTab api={api} detail={detail} locale={locale} onChange={setDetail} onError={fail} />}
+            {tab === "medications" && <MedicationsTab api={api} detail={detail} locale={locale} onChange={setDetail} />}
             {tab === "content" && <ContentTab detail={detail} locale={locale} onChange={setDetail} busy={action === "draft"} onRegenerate={() => (detail.generatedDraft ? setConfirm("regenerate") : void regenerate())} />}
+            {tab === "photos" && <PhotosTab api={api} detail={detail} locale={locale} busy={action === "photo"} onReview={(id, decision) => void reviewPhoto(id, decision)} />}
             {tab === "journey" && <DeliveryTab detail={detail} locale={locale} />}
           </div>
         </>}
@@ -248,6 +263,7 @@ function ApproveDialog({ open, detail, locale, onCancel, onConfirm }: { open: bo
     <ul className="dispatch-list">
       {summary.voiceNote && <li><Icon name="message" size={16} />{t.dispatchVoice}</li>}
       {summary.reminders > 0 && <li><Icon name="pill" size={16} />{count(summary.reminders, t.dispatchReminders1, t.dispatchReminders)}</li>}
+      {summary.photoRequest && <li><Icon name="image" size={16} />{t.dispatchPhotoRequest}</li>}
       {summary.calls.length > 0 && <li><Icon name="phone" size={16} /><span>{count(summary.calls.length, t.dispatchCalls1, t.dispatchCalls)} · {t.firstCallShort} <bdi>{formatShort(summary.calls[0], locale)}</bdi></span></li>}
       {summary.notDispensed.length > 0 && <li><Icon name="alert" size={16} /><span>{count(summary.notDispensed.length, t.dispatchAlerts1, t.dispatchAlerts)}</span></li>}
     </ul>

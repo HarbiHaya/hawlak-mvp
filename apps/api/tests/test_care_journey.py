@@ -93,35 +93,6 @@ def test_hospital_uploads_pdf_then_creates_case_without_entering_clinical_conten
     )
 
 
-def test_insurer_uploads_a_controlled_medication_image(client, internal_auth_headers):
-    seen = {}
-
-    class Storage:
-        def store_case_media(self, **kwargs):
-            seen.update(kwargs)
-            return SimpleNamespace(key="cases/case_poc_01/media/medicine.jpg")
-
-    client.post("/internal/workspace/cases", json=intake_body(), headers=internal_auth_headers)
-    app.dependency_overrides[get_object_storage] = Storage
-    response = client.post(
-        "/internal/workspace/cases/case_poc_01/medication-images",
-        content=b"\xff\xd8\xffsynthetic-image",
-        headers={
-            **internal_auth_headers,
-            "Content-Type": "image/jpeg",
-            "X-Filename": "medicine.jpg",
-        },
-    )
-
-    assert response.status_code == 201
-    assert response.json() == {
-        "objectKey": "cases/case_poc_01/media/medicine.jpg",
-        "filename": "medicine.jpg",
-        "contentType": "image/jpeg",
-    }
-    assert seen["content"] == b"\xff\xd8\xffsynthetic-image"
-
-
 def test_hospital_intake_is_replay_safe_and_visible_to_insurer(
     client, internal_auth_headers, db_session
 ):
@@ -185,9 +156,10 @@ def test_insurer_can_edit_then_approve_exact_content_and_create_delivery_runs(
     assert [item["kind"] for item in approval.json()["deliveryRuns"]] == [
         "discharge_voice_note",
         "medication_reminder",
+        "photo_request",
         "follow_up_call",
     ]
-    assert db_session.query(DeliveryRun).count() == 3
+    assert db_session.query(DeliveryRun).count() == 4
 
     detail = client.get(
         "/internal/workspace/cases/case_poc_01", headers=internal_auth_headers
@@ -202,26 +174,6 @@ def test_insurer_can_edit_then_approve_exact_content_and_create_delivery_runs(
     assert call_plan.status_code == 200
     assert call_plan.json()["questions"] == body["callPlan"]["questions"]
     assert call_plan.json()["participantLabel"] == "أم نورة"
-
-
-def test_unapproved_ocr_candidate_blocks_approval(client, internal_auth_headers):
-    body = intake_body()
-    body["medications"][0]["image"] = {
-        "source": "patient_photo",
-        "objectKey": "synthetic/inbound/unknown.jpg",
-        "reviewStatus": "pending",
-        "ocrCandidate": "دواء تجريبي ألف",
-    }
-    client.post("/internal/workspace/cases", json=body, headers=internal_auth_headers)
-
-    response = client.post(
-        "/internal/workspace/cases/case_poc_01/approve",
-        json={"approvedBy": "SYN-INTEGRATED-CARE-01"},
-        headers={**internal_auth_headers, "Idempotency-Key": "approval-blocked"},
-    )
-
-    assert response.status_code == 409
-    assert response.json() == {"error": "medication_image_requires_review"}
 
 
 def test_call_worker_can_fetch_by_case_only_after_approval(client, internal_auth_headers):
@@ -328,6 +280,7 @@ def test_caregiver_projection_excludes_phone_scripts_and_document(client, intern
             "medicationId": "SYN-MED-001",
             "displayName": "دواء تجريبي ألف",
             "status": "scheduled",
+            "photoStatus": "missing",
         }
     ]
     serialized = str(payload)
@@ -361,6 +314,7 @@ def test_operator_dispatches_due_whatsapp_runs_without_duplicate_provider_calls(
     assert [item["kind"] for item in first.json()["data"]] == [
         "discharge_voice_note",
         "medication_reminder",
+        "photo_request",
     ]
     assert all(item["status"] == "sent" for item in first.json()["data"])
     assert all(item["providerRef"].startswith("mock:") for item in first.json()["data"])
@@ -445,7 +399,10 @@ def test_disabled_voice_note_and_call_need_no_scripts(client, internal_auth_head
     )
 
     assert response.status_code == 200
-    assert [run["kind"] for run in response.json()["deliveryRuns"]] == ["medication_reminder"]
+    assert [run["kind"] for run in response.json()["deliveryRuns"]] == [
+        "medication_reminder",
+        "photo_request",
+    ]
 
 
 def test_insurer_can_view_only_files_that_belong_to_the_case(client, internal_auth_headers):

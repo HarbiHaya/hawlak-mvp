@@ -1,7 +1,7 @@
-import type { CallRepeat, InsuranceRecord } from "../api";
+import type { CallRepeat, InsuranceRecord, PhotoCheckStatus } from "../api";
 import type { Bilingual, Locale } from "../i18n";
 
-export type CaseTab = "source" | "coverage" | "medications" | "content" | "journey";
+export type CaseTab = "source" | "coverage" | "medications" | "content" | "photos" | "journey";
 
 export const t = {
   ar: {
@@ -9,12 +9,12 @@ export const t = {
     toReview: "للمراجعة", approvedFilter: "معتمدة", all: "الكل", filter: "تصفية الحالات", search: "بحث بالاسم أو رقم الحالة",
     noMatches: "لا توجد حالات مطابقة.", noCases: "لا توجد حالات بعد", selectCase: "اختر حالة لعرضها", queueEmptyReview: "لا توجد حالات بانتظار المراجعة.",
     statusDraft: "بانتظار المراجعة", statusApproved: "معتمدة", preferred: "صيغة المخاطبة", openAlerts: "{n} تنبيه مفتوح",
-    source: "ملخص الخروج", coverage: "التغطية", content: "الرسائل والمكالمة", medications: "الأدوية", journey: "التنفيذ",
+    source: "ملخص الخروج", coverage: "التغطية", content: "الرسائل والمكالمة", medications: "الأدوية", photos: "صور الأدوية", journey: "التنفيذ",
     save: "حفظ", saving: "جارٍ الحفظ…", saved: "حُفظت المسودة.", unsaved: "تغييرات غير محفوظة", allSaved: "كل التغييرات محفوظة",
     approve: "اعتماد", approving: "جارٍ الاعتماد…", goTo: "الانتقال إلى {tab}", cancel: "إلغاء",
     approveTitle: "اعتماد خطة المتابعة", approveIntro: "سيُجدول ما يلي لـ {name}:", approveConfirm: "اعتماد وجدولة",
     approveImmutable: "لا يمكن تعديل المحتوى بعد الاعتماد.",
-    dispatchVoice: "رسالة صوتية واحدة عبر واتساب", dispatchReminders: "تذكيرات الأدوية مع صورة العبوة: {n}", dispatchReminders1: "تذكير دواء واحد مع صورة العبوة", dispatchCalls: "مكالمات المتابعة: {n}", dispatchCalls1: "مكالمة متابعة واحدة", firstCallShort: "الأولى",
+    dispatchVoice: "رسالة صوتية واحدة عبر واتساب", dispatchReminders: "تذكيرات الأدوية: {n}", dispatchReminders1: "تذكير دواء واحد", dispatchPhotoRequest: "طلب صور علب الأدوية عبر واتساب", dispatchCalls: "مكالمات المتابعة: {n}", dispatchCalls1: "مكالمة متابعة واحدة", firstCallShort: "الأولى",
     dispatchAlerts: "تنبيهات لأدوية لم تُصرف: {n}", dispatchAlerts1: "تنبيه لدواء لم يُصرف",
     approvedToast: "اعتُمدت خطة المتابعة. رقم التسجيل: {ref}",
     approvedBy: "اعتمدها",
@@ -43,6 +43,10 @@ export const t = {
     uploadImage: "رفع صورة", replaceImage: "استبدال الصورة", uploadingImage: "جارٍ الرفع…", approveImage: "اعتماد الصورة", imageApproved: "صورة معتمدة", imagePending: "صورة بانتظار الاعتماد", imageRejected: "صورة مرفوضة", noImage: "لا توجد صورة",
     addMedication: "إضافة دواء", removeMedication: "حذف الدواء", noMedications: "لا توجد أدوية.", removed: "حُذف «{name}».", undo: "تراجع", unnamed: "دواء بلا اسم",
     notDispensedHint: "يُنشأ تنبيه لفريق الرعاية عند الاعتماد.",
+    patientPhoto: "الصورة من المريض بعد الاعتماد.", photoAfterApproval: "بعد الاعتماد يطلب حولك من المريض تصوير هذه العلبة باسمها المعتمد.",
+    noPhotos: "لم تصل صور علب أدوية من المريض أو مقدم الرعاية بعد.", photosNote: "يطلب حولك صورة كل دواء معتمد باسمه، فترتبط كل صورة بدوائها. يُقرأ النص المطبوع على العلبة فقط ويُقارن آلياً بذلك الدواء. لا يُرسل للمريض أي حكم؛ القرار لك.",
+    sentBy: "أرسلها", fromPatient: "المريض", fromCaregiver: "مقدم الرعاية", label: "المكتوب على العلبة", planned: "الدواء في الخطة", photoStatus: "نتيجة الفحص", notRead: "لم تُقرأ",
+    confirmPhoto: "تأكيد المطابقة", followUp: "يحتاج متابعة", reviewed: "راجعها {who}", photoReviewed: "حُفظت مراجعة الصورة.",
     // Delivery
     demoMode: "وضع العرض: لا تُرسل رسائل ولا تُجرى مكالمات فعلياً، وتُحاكى خطوات التنفيذ فقط.", simulated: "محاكاة — لم يُرسل فعلياً",
     noRuns: "تظهر خطوات التنفيذ بعد الاعتماد.", approvedAt: "تاريخ الاعتماد",
@@ -55,12 +59,12 @@ export const t = {
     toReview: "To review", approvedFilter: "Approved", all: "All", filter: "Filter cases", search: "Search name or case reference",
     noMatches: "No matching cases.", noCases: "No cases yet", selectCase: "Select a case", queueEmptyReview: "No cases are awaiting review.",
     statusDraft: "Awaiting review", statusApproved: "Approved", preferred: "Form of address", openAlerts: "{n} open alerts",
-    source: "Discharge summary", coverage: "Coverage", content: "Messages and call", medications: "Medications", journey: "Delivery",
+    source: "Discharge summary", coverage: "Coverage", content: "Messages and call", medications: "Medications", photos: "Medicine photos", journey: "Delivery",
     save: "Save", saving: "Saving…", saved: "Draft saved.", unsaved: "Unsaved changes", allSaved: "All changes saved",
     approve: "Approve", approving: "Approving…", goTo: "Go to {tab}", cancel: "Cancel",
     approveTitle: "Approve follow-up plan", approveIntro: "The following will be scheduled for {name}:", approveConfirm: "Approve and schedule",
     approveImmutable: "Content cannot be edited after approval.",
-    dispatchVoice: "One WhatsApp voice message", dispatchReminders: "{n} medication reminders with package image", dispatchReminders1: "One medication reminder with package image", dispatchCalls: "{n} follow-up calls", dispatchCalls1: "One follow-up call", firstCallShort: "first",
+    dispatchVoice: "One WhatsApp voice message", dispatchReminders: "{n} medication reminders", dispatchReminders1: "One medication reminder", dispatchPhotoRequest: "One WhatsApp request for medicine-box photos", dispatchCalls: "{n} follow-up calls", dispatchCalls1: "One follow-up call", firstCallShort: "first",
     dispatchAlerts: "{n} alerts for medications not dispensed", dispatchAlerts1: "One alert for a medication not dispensed",
     approvedToast: "Follow-up plan approved. Enrolment reference: {ref}",
     approvedBy: "Approved by",
@@ -85,6 +89,10 @@ export const t = {
     uploadImage: "Upload image", replaceImage: "Replace image", uploadingImage: "Uploading…", approveImage: "Approve image", imageApproved: "Image approved", imagePending: "Image awaiting approval", imageRejected: "Image rejected", noImage: "No image",
     addMedication: "Add medication", removeMedication: "Remove medication", noMedications: "No medications.", removed: "“{name}” removed.", undo: "Undo", unnamed: "Unnamed medication",
     notDispensedHint: "An alert is raised for the care team on approval.",
+    patientPhoto: "Photo sent by the patient after approval.", photoAfterApproval: "After approval, Hawlak asks the patient to photograph this box using its approved name.",
+    noPhotos: "No medicine-box photos have arrived from the patient or caregiver.", photosNote: "Hawlak requests each approved medicine by name, so every photo stays linked to its medicine. Only the printed label is read and compared with that medicine. No verdict is sent to the patient; the decision remains with you.",
+    sentBy: "Sent by", fromPatient: "Patient", fromCaregiver: "Caregiver", label: "Printed label", planned: "Medicine in plan", photoStatus: "Check result", notRead: "Not read",
+    confirmPhoto: "Confirm match", followUp: "Needs follow-up", reviewed: "Reviewed by {who}", photoReviewed: "Photo review saved.",
     demoMode: "Demo mode: no messages are sent and no calls are placed. Delivery steps are simulated.", simulated: "Simulated — not actually sent",
     noRuns: "Delivery steps appear after approval.", approvedAt: "Approved on",
     alerts: "Alerts", open: "Open", resolved: "Resolved", resolve: "Mark resolved", resolvedToast: "Alert resolved.", openCase: "Open case",
@@ -100,8 +108,9 @@ export const runKindLabel: Record<string, Bilingual> = {
   discharge_voice_note: { ar: "رسالة صوتية عبر واتساب", en: "WhatsApp voice message" },
   medication_reminder: { ar: "تذكير دواء", en: "Medication reminder" },
   follow_up_call: { ar: "مكالمة متابعة", en: "Follow-up call" },
+  photo_request: { ar: "طلب صور علب الأدوية عبر واتساب", en: "WhatsApp request for medicine-box photos" },
 };
-export const runKindIcon: Record<string, string> = { discharge_voice_note: "message", medication_reminder: "pill", follow_up_call: "phone" };
+export const runKindIcon: Record<string, string> = { discharge_voice_note: "message", medication_reminder: "pill", follow_up_call: "phone", photo_request: "image" };
 export const runStatusLabel: Record<string, Bilingual> = {
   pending: { ar: "مجدولة", en: "Scheduled" }, claimed: { ar: "قيد الإرسال", en: "Sending" }, sent: { ar: "أُرسلت", en: "Sent" },
   completed: { ar: "اكتملت", en: "Completed" }, failed: { ar: "تعذّر الإرسال", en: "Failed" }, transferred: { ar: "حُوّلت إلى الفريق", en: "Transferred to care team" },
@@ -112,6 +121,16 @@ export const runStatusTone: Record<string, "neutral" | "success" | "warning" | "
 export const alertTypeLabel: Record<string, Bilingual> = {
   medication_access: { ar: "دواء لم يُصرف", en: "Medication not dispensed" },
   call_escalation: { ar: "تصعيد من مكالمة المتابعة", en: "Follow-up call escalation" },
+  medicine_photo_mismatch: { ar: "صورة دواء لا تطابق الخطة", en: "Medicine photo does not match the plan" },
+  medicine_photos_ready: { ar: "وصلت صور كل الأدوية", en: "All medicine photos received" },
+};
+export const photoCheckLabel: Record<PhotoCheckStatus, Bilingual> = {
+  matched: { ar: "مطابقة للخطة", en: "Matches the plan" },
+  strength_mismatch: { ar: "التركيز مختلف عن الخطة", en: "Strength differs from the plan" },
+  different_medicine: { ar: "دواء مختلف عن المطلوب", en: "Different from the requested medicine" },
+  extra: { ar: "صورة إضافية", en: "Extra photo" },
+  unreadable: { ar: "الصورة غير واضحة", en: "Photo not readable" },
+  not_checked: { ar: "بانتظار مراجعتك", en: "Awaiting your check" },
 };
 export const answerKindLabel: Record<string, Bilingual> = {
   red_flag: { ar: "إجابة تشير إلى علامة خطر", en: "Red-flag answer" }, uncertain: { ar: "إجابة غير واضحة", en: "Unclear answer" }, transfer_request: { ar: "طلب التحدث إلى الفريق", en: "Asked to speak to the team" },

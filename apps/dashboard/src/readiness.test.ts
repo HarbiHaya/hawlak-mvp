@@ -37,14 +37,10 @@ describe("approval readiness mirrors the API approval order", () => {
     expect(readiness({ ...readyCase(), insurance: { memberId: "SYN-9", status: "not_eligible" } }).blocker).toBe("member_not_eligible");
   });
 
-  it("requires an approved image only for medications with an active reminder", () => {
-    const pending = readyCase();
-    pending.medications[0].image = { ...pending.medications[0].image!, reviewStatus: "pending" };
-    expect(readiness(pending).blocker).toBe("medication_image_requires_review");
-
-    const noReminder = readyCase();
-    noReminder.medications[0] = { ...noReminder.medications[0], reminderEnabled: false, image: null, reminderScript: "" };
-    expect(readiness(noReminder).blocker).toBe(null);
+  it("does not require a medicine photo before approval", () => {
+    const noPhoto = readyCase();
+    noPhoto.medications[0].image = null;
+    expect(readiness(noPhoto).blocker).toBe(null);
   });
 
   it("flags an incomplete call plan and a first call in the past", () => {
@@ -74,6 +70,7 @@ describe("dispatch summary mirrors scheduled delivery runs", () => {
     const summary = dispatchSummary(detail);
     expect(summary.voiceNote).toBe(true);
     expect(summary.reminders).toBe(1);
+    expect(summary.photoRequest).toBe(true);
     expect(summary.calls.map((date) => date.toISOString())).toEqual(["2026-11-20T07:00:00.000Z", "2026-11-22T07:00:00.000Z", "2026-11-24T07:00:00.000Z"]);
     expect(summary.notDispensed).toEqual(["كارديوفكس"]);
   });

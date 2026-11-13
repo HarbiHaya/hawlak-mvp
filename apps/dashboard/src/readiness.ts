@@ -14,7 +14,6 @@ export type BlockerCode =
   | "medications_required"
   | "medication_details_required"
   | "reminder_script_required"
-  | "medication_image_requires_review"
   | "voice_script_required"
   | "call_plan_incomplete"
   | "call_time_in_past"
@@ -33,7 +32,6 @@ const areaOf: Record<BlockerCode, ReadinessArea> = {
   medications_required: "medications",
   medication_details_required: "medications",
   reminder_script_required: "medications",
-  medication_image_requires_review: "medications",
   voice_script_required: "content",
   call_plan_incomplete: "content",
   call_time_in_past: "content",
@@ -54,7 +52,6 @@ function medicationBlocker(detail: Content): BlockerCode | null {
     if (!medication.displayName.trim() || !medication.doseInstruction.trim()) return "medication_details_required";
     if (medication.dispensed && medication.reminderEnabled) {
       if (!medication.reminderScript.trim()) return "reminder_script_required";
-      if (medication.image?.reviewStatus !== "approved") return "medication_image_requires_review";
     }
   }
   return null;
@@ -90,6 +87,8 @@ export function readiness(detail: Content, now: Date = new Date()): Readiness {
 export interface DispatchSummary {
   voiceNote: boolean;
   reminders: number;
+  /** Approval asks for box photos whenever at least one medicine was dispensed. */
+  photoRequest: boolean;
   calls: Date[];
   /** Medications marked not dispensed: approval raises a medication-access alert for each. */
   notDispensed: string[];
@@ -106,6 +105,7 @@ export function dispatchSummary(detail: Content, approvedAt: Date = new Date()):
   return {
     voiceNote: detail.dischargeVoiceNote.enabled,
     reminders: detail.medications.filter((medication) => medication.dispensed && medication.reminderEnabled).length,
+    photoRequest: detail.medications.some((medication) => medication.dispensed),
     calls: call.enabled ? Array.from({ length: count }, (_, index) => new Date(first.getTime() + index * repeatDays[repeat] * 86_400_000)) : [],
     notDispensed: detail.medications.filter((medication) => !medication.dispensed).map((medication) => medication.displayName),
   };

@@ -14,6 +14,8 @@ const labels = {
     scheduled: "التذكير مفعّل", needs_support: "يتطلب دعماً", reviewNotice: "خطة المتابعة قيد المراجعة لدى شركة التأمين. تظهر مواعيد التذكيرات والمكالمات بعد اعتمادها.",
     alertNotice: "يتابع فريق الرعاية {n} تنبيه مفتوح لهذه الحالة.", empty: "أدخل رقم الحالة", emptyHint: "تظهر هنا حالة الأدوية والمكالمة القادمة والتنبيهات.",
     noMeds: "لا توجد أدوية في الخطة.", updated: "آخر تحديث {time}", refresh: "تحديث", change: "حالة أخرى",
+    photosHint: "أرسل صورة لكل علبة دواء من رقمك المسجّل على واتساب حولك. يراجعها الصيدلي.",
+    photo_missing: "لم تصل صورة", photo_received: "وصلت الصورة", photo_needs_attention: "يراجعها الصيدلي", photo_confirmed: "أكّدها الصيدلي",
   },
   en: {
     title: "Patient follow-up", caseId: "Case reference", caseHint: "Provided by the hospital at discharge.", open: "View", loading: "Loading…",
@@ -22,6 +24,8 @@ const labels = {
     scheduled: "Reminder active", needs_support: "Support required", reviewNotice: "The follow-up plan is under review by the insurer. Reminder and call times appear once it is approved.",
     alertNotice: "The care team is following up on {n} open alerts for this case.", empty: "Enter a case reference", emptyHint: "Medication status, the next call and alerts appear here.",
     noMeds: "No medications in the plan.", updated: "Updated {time}", refresh: "Refresh", change: "Another case",
+    photosHint: "Send a photo of each medicine box from your registered number to Hawlak on WhatsApp. A pharmacist reviews them.",
+    photo_missing: "No photo yet", photo_received: "Photo received", photo_needs_attention: "Pharmacist reviewing", photo_confirmed: "Confirmed by pharmacist",
   },
 } as const;
 
@@ -97,9 +101,10 @@ export function CaregiverWorkspace({ api, locale }: { api: HawlakApi; locale: Lo
         {data.medications.length === 0 ? <EmptyState compact icon="pill" title={t.noMeds} />
           : <ul className="rows">{data.medications.map((item) => <li key={item.medicationId} className="row">
             <span className="row__icon"><Icon name="pill" size={15} /></span>
-            <div className="row__main"><b>{item.displayName}</b></div>
+            <div className="row__main"><b>{item.displayName}</b>{item.photoStatus && <small className={`photo-state photo-state--${item.photoStatus}`}>{t[`photo_${item.photoStatus}`]}</small>}</div>
             {approved && <Badge tone={item.status === "scheduled" ? "success" : "warning"}>{t[item.status]}</Badge>}
           </li>)}</ul>}
+        {approved && data.medications.length > 0 && <p className="photo-hint">{t.photosHint}</p>}
       </section>
     </div>}
   </div>;

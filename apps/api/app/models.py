@@ -44,6 +44,8 @@ class PatientCase(Base):
     id: Mapped[str] = mapped_column(String(128), primary_key=True, default=new_id)
     patient_alias: Mapped[str] = mapped_column(String(200))
     phone_e164: Mapped[str] = mapped_column(String(16))
+    # A caregiver the hospital registered with consent; may send medicine photos for the patient.
+    caregiver_phone_e164: Mapped[str | None] = mapped_column(String(16), nullable=True)
     dialect_code: Mapped[str] = mapped_column(String(50))
     expected_box_count: Mapped[int] = mapped_column(Integer)
     status: Mapped[str] = mapped_column(String(32), default="active")
@@ -94,7 +96,8 @@ class DeliveryRun(Base):
     __table_args__ = (
         UniqueConstraint("idempotency_key", name="uq_delivery_runs_idempotency_key"),
         CheckConstraint(
-            "kind IN ('discharge_voice_note', 'medication_reminder', 'follow_up_call')",
+            "kind IN ('discharge_voice_note', 'medication_reminder', 'follow_up_call', "
+            "'photo_request')",
             name="ck_delivery_runs_kind",
         ),
         CheckConstraint(
@@ -240,6 +243,17 @@ class InboundMedia(Base):
     object_sha256: Mapped[str | None] = mapped_column(String(128), nullable=True)
     processing_status: Mapped[str] = mapped_column(String(32))
     processing_error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    # Medicine-box check: who sent it, what the label says, how code compared it to the plan,
+    # and what a person decided. The reading never reaches the patient.
+    sender_role: Mapped[str] = mapped_column(
+        String(16), default="patient", server_default="patient"
+    )
+    label_reading: Mapped[dict[str, Any] | None] = mapped_column(JSON_VALUE, nullable=True)
+    check_status: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    medication_id: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    review_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    reviewed_by: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     received_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
 
 

@@ -1,7 +1,4 @@
-import {
-  PharmacistReviewRequestedSchema,
-  type PharmacistReviewRequested,
-} from "@hawlak/contracts";
+import type { PharmacistReviewRequested } from "@hawlak/contracts";
 import type { UserRole } from "./routing";
 
 export interface DemoSession {
@@ -497,6 +494,9 @@ export class HawlakApi {
     const page = await this.request<{ data: unknown[]; nextCursor: string | null }>(
       `/internal/review-events${search}`,
     );
+    // The schema (and zod) load only when this legacy pharmacist feed is used,
+    // which keeps them out of the main dashboard bundle.
+    const { PharmacistReviewRequestedSchema } = await import("@hawlak/contracts");
     return {
       data: page.data.map((item) => PharmacistReviewRequestedSchema.parse(item)),
       nextCursor: page.nextCursor,

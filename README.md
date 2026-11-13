@@ -21,9 +21,11 @@ One bilingual (Arabic/English) web app with role-scoped demo login:
    reminder per medicine, and the call script. It also checks the member's
    eligibility with the insurer system. The insurer system is simulated by
    `MockInsurerSystems`.
-3. **Insurer** reviews the case in five tabs: source, coverage, content,
-   medications and journey. Each text shows whether it was generated or edited by
-   the reviewer, and the reviewer can regenerate drafts. The reviewer schedules
+3. **Insurer** reviews the case in five tabs: discharge summary, coverage,
+   medications, messages and call, and delivery. A readiness strip names the
+   first rule that blocks approval and links to the tab that fixes it; each tab
+   shows whether it is complete. Each text shows whether it was generated or
+   edited by the reviewer, and the reviewer can regenerate drafts. The reviewer schedules
    calls (24/48/72 hours, or an exact date and time; repeating daily, every 2 days
    or weekly; up to 14 calls), then approves. Approval needs an eligible member,
    records an enrollment reference and creates the delivery runs.
@@ -57,6 +59,13 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
   - the case ID or the source filename.
   Drafts greet without a name unless a form of address is approved.
 - Honest delivery labels in mock mode.
+- Dashboard redesign (13 November 2026): design tokens from
+  `docs/design-system`, an approval readiness check that mirrors the API rules,
+  a confirmation that lists what approval will schedule, unsaved-change
+  tracking with save on case switch and Ctrl/⌘+S, case deep links
+  (`?case=`), alert-to-case links, a live admin overview, inline form
+  validation, a mobile navigation drawer and keyboard-accessible tabs and
+  dialogs.
 - AWS hosting with scripts:
   - `provision.sh`
   - `deploy.sh`

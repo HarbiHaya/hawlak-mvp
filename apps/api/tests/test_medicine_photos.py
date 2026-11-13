@@ -21,6 +21,7 @@ from app.services.medicine_photos import (
     LabelReading,
     compare_reading,
     photo_request_text,
+    template_body,
 )
 from app.services.object_storage import StoredObject
 from app.services.whatsapp_client import DownloadedMedia
@@ -288,6 +289,8 @@ def test_approval_needs_no_insurer_image_and_queues_the_photo_request(db_session
         *CareJourneyService(db_session)._get("case_photo_01"),
     )
     assert payload.text == AR["request"].format(n=1, total=2, name="Zentorin 5 mg")
+    # The same three values fill the WhatsApp template when one is configured.
+    assert (payload.template_values, payload.language) == (("1", "2", "Zentorin 5 mg"), "ar")
 
 
 @pytest.mark.anyio
@@ -376,10 +379,15 @@ class LiveFakes:
         self.calls.append(("text", to, text))
         return "wamid.text"
 
+    async def send_template(self, to, name, language, values):
+        self.calls.append(("template", to, name, language, values))
+        return "wamid.template"
 
-def live_adapter(fakes) -> LiveJourneyDeliveryAdapter:
+
+def live_adapter(fakes, template: str | None = None) -> LiveJourneyDeliveryAdapter:
     adapter = object.__new__(LiveJourneyDeliveryAdapter)
     adapter._whatsapp = adapter._renderer = fakes
+    adapter._settings = SimpleNamespace(whatsapp_photo_request_template=template)
     return adapter
 
 
@@ -402,6 +410,25 @@ async def test_live_delivery_sends_the_photo_request_as_text():
     ref = await live_adapter(fakes).deliver(payload("photo_request", text="Please photograph"))
     assert ref == "wamid.text"
     assert fakes.calls == [("text", PATIENT, "Please photograph")]
+
+
+@pytest.mark.anyio
+async def test_a_configured_template_carries_the_photo_request_outside_the_24_hour_window():
+    fakes = LiveFakes()
+    request = payload(
+        "photo_request", text="Please photograph", template_values=("1", "2", "Zen"), language="en"
+    )
+    ref = await live_adapter(fakes, template="hawlak_photo_request").deliver(request)
+    assert ref == "wamid.template"
+    assert fakes.calls == [("template", PATIENT, "hawlak_photo_request", "en", ["1", "2", "Zen"])]
+
+
+def test_the_template_wording_is_the_approved_request_wording():
+    # Meta's template body must be this text, with {{1}}, {{2}} and {{3}} in place of the values.
+    for language in ("ar", "en"):
+        assert template_body(language) == PHOTO_REPLIES[language]["request"].format(
+            n="{{1}}", total="{{2}}", name="{{3}}"
+        )
 
 
 @pytest.mark.anyio

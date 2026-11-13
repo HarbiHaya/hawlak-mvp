@@ -156,6 +156,8 @@ def draft_medications(extraction: DischargeExtraction) -> list[dict]:
             "image": None,
             "reminderEnabled": False,
             "reminderScript": "",
+            "unitStrength": None,
+            "reminderTimes": [],
         }
         for index, medication in enumerate(extraction.medications, start=1)
     ]

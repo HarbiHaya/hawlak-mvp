@@ -94,4 +94,6 @@ def test_medications_become_editable_draft_rows(fixtures_dir):
         "image": None,
         "reminderEnabled": False,
         "reminderScript": "",
+        "unitStrength": None,
+        "reminderTimes": [],
     }

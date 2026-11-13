@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 
 import { displayError, type Locale } from "./App";
 import { Icon } from "./Icon";
-import type { CallPlan, CallRepeat, DischargeExtraction, GeneratedDraft, HawlakApi, InsuranceRecord, PhotoCheckStatus, WorkspaceAlert, WorkspaceCaseDetail, WorkspaceCaseSummary, WorkspaceMedication } from "./api";
+import type { CallPlan, CallRepeat, DischargeExtraction, DoseFacts, FactSource, GeneratedDraft, HawlakApi, InsuranceRecord, PhotoCheckStatus, WorkspaceAlert, WorkspaceCaseDetail, WorkspaceCaseSummary, WorkspaceMedication } from "./api";
 
 type Section = "cases" | "alerts";
 type Tab = "source" | "coverage" | "content" | "medications" | "photos" | "journey";
@@ -19,6 +19,8 @@ const labels = {
     transfer: "نص التحويل إلى فريق الرعاية", responder: "رقم فريق الاستجابة", team: "جهة التحويل", approved: "معتمدة", pending: "بانتظار المراجعة",
     rejected: "مرفوضة", noAlerts: "لا توجد تنبيهات مفتوحة.", open: "مفتوح", resolved: "تمت المعالجة",
     document: "ملخص الخروج", patient: "المريض", preferred: "صيغة المخاطبة", status: "حالة المراجعة", medicationName: "اسم الدواء",
+    unitStrength: "تركيز الحبة أو الكبسولة المؤكد", reminderTimes: "أوقات التذكير (بتوقيت السعودية)", timesHint: "مثال: 08:00، 20:00. بدونها يُرسل التذكير عند الاعتماد.",
+    factDose: "الجرعة الموصوفة", factUnits: "عدد الحبات لكل جرعة", factTimes: "أوقات التذكير", factsAfterSave: "تُحدَّث بعد الحفظ.",
     dose: "تعليمات الجرعة", reminder: "نص التذكير", dispensed: "تم صرف الدواء", enableReminder: "تفعيل تذكير الدواء",
     addMedication: "إضافة دواء", remove: "حذف", noMedications: "لم تُضف أدوية بعد. يجب إضافة دواء واحد على الأقل قبل الاعتماد.",
     queued: "اعتُمدت خطة المتابعة وجُدولت الرسائل والمكالمات للإرسال. رقم التسجيل في البرنامج: {ref}.", saved: "حُفظت المسودة.", openPdf: "فتح الملف في نافذة جديدة",
@@ -50,6 +52,8 @@ const labels = {
     transfer: "Transfer to care team message", responder: "Responder phone number", team: "Transfer destination", approved: "Approved", pending: "Pending review",
     rejected: "Rejected", noAlerts: "There are no open alerts.", open: "Open", resolved: "Resolved",
     document: "Discharge summary", patient: "Patient", preferred: "Form of address", status: "Review status", medicationName: "Medication name",
+    unitStrength: "Confirmed strength of one tablet or capsule", reminderTimes: "Reminder times (Saudi time)", timesHint: "Example: 08:00, 20:00. Without them the reminder goes at approval.",
+    factDose: "Prescribed dose", factUnits: "Tablets or capsules per dose", factTimes: "Reminder times", factsAfterSave: "Updated after saving.",
     dose: "Dose instruction", reminder: "Reminder text", dispensed: "Medication dispensed", enableReminder: "Enable medication reminder",
     addMedication: "Add medication", remove: "Remove", noMedications: "No medications have been added. At least one medication is required before approval.",
     queued: "The follow-up plan is approved and messages and calls are scheduled. Programme enrolment reference: {ref}.", saved: "Draft saved.", openPdf: "Open in a new window",
@@ -107,6 +111,19 @@ const answerKindLabel: Record<string, { ar: string; en: string }> = {
 const repeatLabel: Record<CallRepeat, { ar: string; en: string }> = {
   none: { ar: "مرة واحدة", en: "Once" }, daily: { ar: "يومياً", en: "Daily" }, every_2_days: { ar: "كل يومين", en: "Every 2 days" }, weekly: { ar: "أسبوعياً", en: "Weekly" },
 };
+const factSourceLabels: Record<FactSource, { ar: string; en: string }> = {
+  prescribed: { ar: "من تعليمات الخروج", en: "from the discharge instructions" }, calculated: { ar: "محسوب", en: "calculated" },
+  reminder_preference: { ar: "وقت تذكير مختار", en: "chosen reminder time" }, unknown: { ar: "غير معروف", en: "unknown" },
+};
+const factReasonLabels: Record<string, { ar: string; en: string }> = {
+  prescribed_dose_unknown: { ar: "لا توجد جرعة واحدة واضحة في التعليمات", en: "the instruction has no single dose amount" },
+  count_already_prescribed: { ar: "العدد مذكور في التعليمات", en: "the instruction already gives the count" },
+  unit_strength_unknown: { ar: "يحتاج تركيز الحبة المؤكد", en: "needs the confirmed strength" },
+  unit_mismatch: { ar: "وحدة الجرعة تختلف عن وحدة التركيز", en: "dose and strength use different units" },
+  not_whole_unit: { ar: "ليست حبة كاملة؛ يراجعها الصيدلي", en: "not a whole tablet; a pharmacist must check" },
+};
+const CLOCK_TIME = /^([01]\d|2[0-3]):[0-5]\d$/;
+const parseTimes = (text: string) => text.split(/[,،\s]+/).map((value) => value.padStart(5, "0")).filter((value) => CLOCK_TIME.test(value));
 const repeatDays: Record<CallRepeat, number> = { none: 0, daily: 1, every_2_days: 2, weekly: 7 };
 type Origin = "generated" | "edited" | "manual";
 const originOf = (current: string, generated: string | undefined): Origin => generated === undefined ? "manual" : current.trim() === generated.trim() ? "generated" : "edited";
@@ -119,6 +136,19 @@ function OriginBadge({ origin, locale }: { origin: Origin; locale: Locale }) {
 }
 
 const pick = (labels: Record<string, { ar: string; en: string }>, key: string, locale: Locale) => labels[key]?.[locale] ?? key;
+
+// Each dose detail with its source. Unknown stays unknown: nothing here is inferred in the browser.
+function DoseFactsLine({ facts, locale }: { facts: DoseFacts | undefined; locale: Locale }) {
+  if (!facts) return null;
+  const t = labels[locale];
+  const source = (fact: { source: FactSource; reason?: string }) => pick(factSourceLabels, fact.source, locale) + (fact.reason ? `: ${pick(factReasonLabels, fact.reason, locale)}` : "");
+  const rows: Array<[string, string | number | null, { source: FactSource; reason?: string }]> = [
+    [t.factDose, facts.prescribedDose.value, facts.prescribedDose],
+    [t.factUnits, facts.unitsPerDose.value, facts.unitsPerDose],
+    [t.factTimes, facts.reminderTimes.value.join(locale === "ar" ? "، " : ", ") || null, facts.reminderTimes],
+  ];
+  return <span className="field-hint field-span dose-facts">{rows.map(([label, value, fact]) => <span key={label}>{label}: {value !== null && <b dir="ltr">{value}</b>} ({source(fact)})</span>)}<span>{t.factsAfterSave}</span></span>;
+}
 
 function alertDetail(alert: WorkspaceAlert, locale: Locale): string {
   if (alert.type === "medication_access") return alert.summary.split(": ").slice(1).join(": ");
@@ -249,7 +279,7 @@ export function InsurerWorkspace({ api, locale, section, reviewer }: { api: Hawl
     if (!detail || detail.reviewStatus === "approved") return;
     const medication: WorkspaceMedication = {
       medicationId: `SYN-MED-${crypto.randomUUID().slice(0, 8)}`, displayName: "", doseInstruction: "", dispensed: true,
-      image: null, reminderEnabled: false, reminderScript: "",
+      image: null, reminderEnabled: false, reminderScript: "", unitStrength: null, reminderTimes: [],
     };
     setDetail({ ...detail, medications: [...detail.medications, medication] });
   }
@@ -403,6 +433,10 @@ function MedicationsTab({ api, detail, locale, onUpdate, onAdd, onRemove }: { ap
         <label>{t.medicationName}<input disabled={locked} value={item.displayName} onChange={(event) => onUpdate(item.medicationId, { displayName: event.target.value })} /></label>
         <label>{t.dose}<input disabled={locked} value={item.doseInstruction} onChange={(event) => onUpdate(item.medicationId, { doseInstruction: event.target.value })} /></label>
         <label className="field-span"><span className="label-row">{t.reminder}<OriginBadge origin={originOf(item.reminderScript, detail.generatedDraft?.reminderScripts[item.medicationId])} locale={locale} /></span><input dir="auto" disabled={locked} value={item.reminderScript} onChange={(event) => onUpdate(item.medicationId, { reminderScript: event.target.value })} /></label>
+        <label>{t.unitStrength}<input dir="ltr" disabled={locked} placeholder="40 mg" value={item.unitStrength ?? ""} onChange={(event) => onUpdate(item.medicationId, { unitStrength: event.target.value || null })} /></label>
+        {/* Parsed when the field loses focus, so commas and spaces can be typed freely. */}
+        <label>{t.reminderTimes}<input dir="ltr" disabled={locked} placeholder="08:00, 20:00" defaultValue={(item.reminderTimes ?? []).join(", ")} onBlur={(event) => { const times = parseTimes(event.target.value); event.target.value = times.join(", "); onUpdate(item.medicationId, { reminderTimes: times }); }} /><span className="field-hint">{t.timesHint}</span></label>
+        <DoseFactsLine facts={detail.doseFacts?.[item.medicationId]} locale={locale} />
         <label className="checkbox-field"><input type="checkbox" disabled={locked} checked={item.dispensed} onChange={(event) => onUpdate(item.medicationId, { dispensed: event.target.checked, reminderEnabled: event.target.checked ? item.reminderEnabled : false })} />{t.dispensed}</label>
         <label className="checkbox-field"><input type="checkbox" disabled={locked || !item.dispensed} checked={item.reminderEnabled} onChange={(event) => onUpdate(item.medicationId, { reminderEnabled: event.target.checked })} />{t.enableReminder}</label>
         {item.dispensed && <span className="field-hint field-span">{patientPhoto(item.medicationId) ? t.patientPhoto : t.photoAfterApproval}</span>}

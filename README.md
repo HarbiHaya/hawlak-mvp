@@ -69,7 +69,18 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
     against that one medicine. Identical photos are read once.
   - Fixed replies only. A mismatch alerts the reviewer, who confirms or marks
     follow-up. Reminders then carry the patient's matched or confirmed box photo.
-- Checks: API 233 tests, dashboard 19 tests, contracts 3 tests, typecheck and build.
+- Sourced dose details (`apps/api/app/services/dose_facts.py`):
+  - Each detail carries its source: `prescribed` (in the discharge instructions),
+    `calculated` (by code), `reminder_preference` (a chosen time) or `unknown`.
+  - Tablets or capsules per dose = prescribed dose ÷ the strength the insurer confirms.
+    Code gives a count only for a whole number in the same unit. A part of a tablet,
+    a unit mismatch or a missing strength stays `unknown`.
+  - Reminder times are chosen clock times in Saudi time. "Twice daily" never becomes a
+    time or an interval. With no chosen time the reminder goes at approval.
+  - The model only phrases these fields in the patient's dialect; it never calculates.
+- WhatsApp template for the photo request: the code sends it when
+  `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names an approved template; otherwise plain text.
+- Checks: API 247 tests, dashboard 19 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 

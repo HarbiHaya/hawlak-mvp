@@ -10,7 +10,8 @@ from sqlalchemy.orm import Session, object_session
 from app.config import Settings
 from app.models import CareJourney, DeliveryRun, InboundMedia, PatientCase, utc_now
 from app.schemas.voice import ApprovedVoiceScript
-from app.services.medicine_photos import photo_request_text
+from app.services.dose_facts import reminder_medication_id
+from app.services.medicine_photos import photo_request_text, photo_request_values
 from app.services.object_storage import ObjectStorage
 from app.services.voice_renderer import build_voice_renderer, checksum_script
 from app.services.whatsapp_client import WhatsAppClient
@@ -32,6 +33,8 @@ class JourneyDeliveryPayload:
     approved_by: str
     voice_script: str | None = None
     text: str | None = None
+    template_values: tuple[str, ...] | None = None
+    language: str = "ar"
     image_object_key: str | None = None
     image_content_type: str | None = None
 
@@ -61,6 +64,11 @@ class LiveJourneyDeliveryAdapter:
         if payload.kind == "photo_request":
             if not payload.text:
                 raise JourneyDeliveryError("no dispensed medicine to photograph")
+            template = self._settings.whatsapp_photo_request_template
+            if template and payload.template_values:
+                return await self._whatsapp.send_template(
+                    payload.phone_e164, template, payload.language, list(payload.template_values)
+                )
             return await self._whatsapp.send_text(payload.phone_e164, payload.text)
         if not payload.voice_script:
             raise JourneyDeliveryError("approved voice script is missing")
@@ -183,14 +191,16 @@ class JourneyDeliveryOrchestrator:
     ) -> JourneyDeliveryPayload:
         script: str | None = None
         text: str | None = None
+        template_values: tuple[str, ...] | None = None
         image_key: str | None = None
         image_type: str | None = None
         if run.kind == "photo_request":
             text = photo_request_text(journey.medications, journey.language_code)
+            template_values = photo_request_values(journey.medications)
         elif run.kind == "discharge_voice_note":
             script = journey.discharge_voice_note.get("script")
         elif run.kind == "medication_reminder":
-            medication_id = run.content_ref.split(":", 1)[-1]
+            medication_id = reminder_medication_id(run.content_ref)
             medication = next(
                 (item for item in journey.medications if item.get("medicationId") == medication_id),
                 None,
@@ -210,6 +220,8 @@ class JourneyDeliveryOrchestrator:
             approved_by=journey.approved_by or "",
             voice_script=script,
             text=text,
+            template_values=template_values,
+            language=journey.language_code,
             image_object_key=image_key,
             image_content_type=image_type,
         )

@@ -1,10 +1,11 @@
 from datetime import datetime
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
 from app.dialects import DialectCode
+from app.services.dose_facts import REMINDER_TIME
 
 MEMBER_ID = r"^[A-Za-z0-9-]{4,32}$"
 
@@ -39,6 +40,12 @@ class JourneyMedication(CamelModel):
     image: MedicationImage | None = None
     reminder_enabled: bool
     reminder_script: str = Field(max_length=1000)
+    # Confirmed strength of one dispensed tablet or capsule, e.g. "40 mg". See dose_facts.
+    unit_strength: str | None = Field(default=None, max_length=50)
+    # Chosen reminder clock times, 24-hour HH:MM in Saudi time.
+    reminder_times: list[Annotated[str, Field(pattern=REMINDER_TIME)]] = Field(
+        default_factory=list, max_length=6
+    )
 
     @model_validator(mode="after")
     def validate_reminder(self):

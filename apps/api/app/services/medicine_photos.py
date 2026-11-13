@@ -17,17 +17,18 @@ from pathlib import Path
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "medicine-label-v1.txt"
 
 # Fixed replies. {name} is only ever an insurer-approved medicine name; no reply gives a
-# verdict on the photo.
+# verdict on the photo. "request" is also the Meta template body, so its values keep words
+# between them: Meta rejects placeholders separated only by punctuation.
 PHOTO_REPLIES = {
     "ar": {
-        "request": "فضلاً صوّر علبة الدواء {n} من {total}: {name}، وأرسل الصورة هنا.",
+        "request": "فضلاً صوّر علبة الدواء رقم {n} من {total}، واسمه {name}، وأرسل الصورة هنا.",
         "next": "وصلت الصورة، شكراً. الآن صوّر علبة الدواء {n} من {total}: {name}.",
         "retake": "الصورة غير واضحة. فضلاً صوّر اسم الدواء المكتوب على علبة {name} مرة ثانية.",
         "complete": "شكراً، وصلت صور كل الأدوية. بيراجعها الصيدلي ويتواصل معكم إذا احتاج.",
         "received_extra": "وصلت الصورة، شكراً.",
     },
     "en": {
-        "request": "Please photograph medicine box {n} of {total}: {name}, and send it here.",
+        "request": "Please photograph medicine box {n} of {total}, named {name}, and send it here.",
         "next": "Photo received, thank you. Now photograph medicine box {n} of {total}: {name}.",
         "retake": "The photo is not clear. Please photograph the name printed on the {name} "
         "box again.",
@@ -88,12 +89,24 @@ def reply(language: str, kind: str, **values) -> str:
     return PHOTO_REPLIES.get(language, PHOTO_REPLIES["ar"])[kind].format(**values)
 
 
-def photo_request_text(medications: list[dict], language: str) -> str | None:
-    """The first request, sent after approval. None when no medicine was dispensed."""
+def photo_request_values(medications: list[dict]) -> tuple[str, str, str] | None:
+    """Box number, box total and medicine name for the first request, sent after approval.
+    None when no medicine was dispensed."""
     dispensed = [m for m in medications if m["dispensed"]]
-    if not dispensed:
-        return None
-    return reply(language, "request", n=1, total=len(dispensed), name=dispensed[0]["displayName"])
+    return ("1", str(len(dispensed)), dispensed[0]["displayName"]) if dispensed else None
+
+
+def photo_request_text(medications: list[dict], language: str) -> str | None:
+    values = photo_request_values(medications)
+    return (
+        reply(language, "request", n=values[0], total=values[1], name=values[2]) if values else None
+    )
+
+
+def template_body(language: str) -> str:
+    """The body to register with Meta for the photo-request template: the same approved
+    wording, with {{1}} box number, {{2}} box total and {{3}} medicine name."""
+    return reply(language, "request", n="{{1}}", total="{{2}}", name="{{3}}")
 
 
 class OpenAILabelReader:

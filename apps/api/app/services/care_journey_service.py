@@ -20,6 +20,7 @@ from app.schemas.care_journey import (
     CareJourneyCreate,
 )
 from app.services.discharge_parser import DischargeExtraction, draft_medications
+from app.services.dose_facts import dose_facts, reminder_medication_id, reminder_run_times
 from app.services.insurer_systems import MockInsurerSystems
 from app.services.medicine_photos import MISMATCH
 from app.services.patient_identifiers import find_identifier
@@ -129,6 +130,7 @@ class CareJourneyService:
             "sourceDocument": journey.source_document,
             "dischargeVoiceNote": journey.discharge_voice_note,
             "medications": journey.medications,
+            "doseFacts": {m["medicationId"]: dose_facts(m) for m in journey.medications},
             "callPlan": journey.call_plan,
             "insurance": journey.insurance,
             "generatedDraft": journey.generated_draft,
@@ -217,14 +219,15 @@ class CareJourneyService:
             )
         for medication in journey.medications:
             if medication["dispensed"] and medication["reminderEnabled"]:
-                runs.append(
-                    self._run(
-                        case_id,
-                        "medication_reminder",
-                        f"medications:{medication['medicationId']}",
-                        approved_at,
+                ref = f"medications:{medication['medicationId']}"
+                # Chosen clock times when there are any; otherwise once, at approval.
+                chosen = reminder_run_times(medication.get("reminderTimes") or [], approved_at)
+                for label, at in chosen or [("", approved_at)]:
+                    runs.append(
+                        self._run(
+                            case_id, "medication_reminder", f"{ref}@{label}" if label else ref, at
+                        )
                     )
-                )
         if any(medication["dispensed"] for medication in journey.medications):
             # The patient photographs each approved box; see medicine_photos.
             runs.append(self._run(case_id, "photo_request", "medicinePhotos", approved_at))
@@ -503,7 +506,9 @@ class CareJourneyService:
         runs = self._runs(case_id)
         photos = self._photos(case_id)
         reminder_ids = {
-            run.content_ref.split(":", 1)[1] for run in runs if run.kind == "medication_reminder"
+            reminder_medication_id(run.content_ref)
+            for run in runs
+            if run.kind == "medication_reminder"
         }
         return {
             "caseId": case_id,

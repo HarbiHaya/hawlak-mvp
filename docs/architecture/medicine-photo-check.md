@@ -113,9 +113,32 @@ OCR finds no approved name. That adds a dependency and is only worth it at volum
 - [x] Caregiver photo status
 - [x] Reminders use the matched or confirmed patient photo, or go voice-only
 - [x] Out-of-order photos link to their own waiting medicine instead of raising an alert
-- [x] Tests: API 233, dashboard 19; live reader checked with synthetic boxes
-- [ ] WhatsApp template for the photo request (needed outside the 24-hour window)
+- [x] Tests: API 247, dashboard 19; live reader checked with synthetic boxes
+- [x] Photo request sent as a WhatsApp template when `WHATSAPP_PHOTO_REQUEST_TEMPLATE` is set
+- [ ] Create that template in Meta and get it approved (see below)
 - [ ] Recorded caregiver consent and revocation
 - [ ] Arabic-only plan names: add a Latin name or code so they can match a box
 - [ ] Contract review of `caregiverPhoneE164`, `medicinePhotos` and `photo_request` by Haya and Retaj
 - [ ] Optional OCR-first path if volume makes model reads matter
+
+## WhatsApp template
+
+Meta delivers plain text only within 24 hours of the patient's last message. The
+photo request is the first message after approval, so it needs an approved
+template. The code sends the template when `WHATSAPP_PHOTO_REQUEST_TEMPLATE` is
+set, and plain text otherwise.
+
+Create one template in Meta, category Utility, in languages `ar` and `en`, with
+exactly the wording of `PHOTO_REPLIES["request"]` (`medicine_photos.template_body`
+returns it, and a test keeps the two the same):
+
+| Language | Body |
+|---|---|
+| `ar` | فضلاً صوّر علبة الدواء رقم {{1}} من {{2}}، واسمه {{3}}، وأرسل الصورة هنا. |
+| `en` | Please photograph medicine box {{1}} of {{2}}, named {{3}}, and send it here. |
+
+`{{1}}` is the box number, `{{2}}` the number of boxes and `{{3}}` the approved
+medicine name. After Meta approves it, set the variable in `.env`, run
+`deploy/aws/sync_keys.sh`, and the next photo request uses it. The follow-up
+replies (next box, retake, complete) stay plain text: they answer a photo, so
+they are always inside the window.

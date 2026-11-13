@@ -34,6 +34,8 @@ def synthetic_reviewed_content() -> dict:
                 },
                 "reminderEnabled": True,
                 "reminderScript": "هذا تذكير معتمد بجرعة دواء تجريبي باء.",
+                "unitStrength": None,
+                "reminderTimes": [],
             }
         ],
         "callPlan": {

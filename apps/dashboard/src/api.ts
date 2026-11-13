@@ -90,6 +90,19 @@ export interface WorkspaceMedication {
   image: MedicationImage | null;
   reminderEnabled: boolean;
   reminderScript: string;
+  /** Confirmed strength of one dispensed tablet or capsule, e.g. "40 mg". */
+  unitStrength?: string | null;
+  /** Chosen reminder clock times, 24-hour HH:MM in Saudi time. */
+  reminderTimes?: string[];
+}
+
+/** Where a dose detail came from. Code calculates; "unknown" is never filled in by guessing. */
+export type FactSource = "prescribed" | "calculated" | "reminder_preference" | "unknown";
+
+export interface DoseFacts {
+  prescribedDose: { value: string | null; source: FactSource };
+  unitsPerDose: { value: number | null; source: FactSource; reason?: string };
+  reminderTimes: { value: string[]; source: FactSource };
 }
 
 export interface CallQuestion {
@@ -127,6 +140,8 @@ export interface WorkspaceCaseDetail extends WorkspaceCaseSummary {
   sourceDocument: { objectKey: string; filename: string };
   dischargeVoiceNote: DischargeVoiceNote;
   medications: WorkspaceMedication[];
+  /** Read-only, by medicationId, computed from the saved medicines. */
+  doseFacts?: Record<string, DoseFacts>;
   callPlan: CallPlan;
   insurance: InsuranceRecord | null;
   deliveryMode?: "mock" | "live";

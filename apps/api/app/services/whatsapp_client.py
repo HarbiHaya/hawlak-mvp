@@ -65,6 +65,18 @@ class WhatsAppClient:
         )
         return _message_id(body)
 
+    async def send_template(self, to: str, name: str, language: str, values: list[str]) -> str:
+        """An approved template is the only message Meta delivers outside the 24-hour window."""
+        template = {
+            "name": name,
+            "language": {"code": language},
+            "components": [
+                {"type": "body", "parameters": [{"type": "text", "text": v} for v in values]}
+            ],
+        }
+        body = await self._post("messages", json=_message(to, "template", template))
+        return _message_id(body)
+
     async def upload_audio(self, audio: bytes, filename: str) -> str:
         return await self._upload_media(audio, filename, "audio/ogg")
 

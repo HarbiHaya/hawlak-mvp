@@ -4,7 +4,8 @@ Every draft is only a proposal: the insurer reviews and approves the exact words
 The template drafter copies document facts into fixed bilingual sentences. The live
 drafter lets the model rephrase in the patient's dialect, then guard_draft rejects any
 number the document does not contain or any medicine that went missing, and the
-template draft is used instead.
+template draft is used instead. Tablet counts and reminder times come only from the fixed
+fields in dose_facts; the model phrases them and never calculates.
 """
 
 import json
@@ -16,9 +17,10 @@ from typing import Any, Protocol
 
 from app.dialects import get_dialect_profile
 from app.services.discharge_parser import DischargeExtraction
+from app.services.dose_facts import dose_facts
 
 logger = logging.getLogger(__name__)
-PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "journey-draft-v3.txt"
+PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "journey-draft-v4.txt"
 WARNING_HEADINGS = ("warning", "red flag", "علامات الخطر", "علامات التحذير")
 ARABIC_HEADINGS = {"activity": "النشاط", "diet": "الغذاء", "follow": "المتابعة"}
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
@@ -41,6 +43,7 @@ TEXT = {
         "at once: {items}.",
         "closing": "Please keep this message for reference.",
         "reminder": "Hawlak reminder: it is time to take {name}. {instruction}",
+        "units": "Number of tablets or capsules per dose: {count}.",
         "opening": "Hello{label}. This is Hawlak, calling on behalf of your care team to follow "
         "up on your recovery after discharge. I will ask a few short questions. "
         "Please answer yes or no.",
@@ -60,6 +63,7 @@ TEXT = {
         "warning_no_number": "إذا لاحظت أياً مما يلي فاطلب الرعاية الطبية العاجلة فوراً: {items}.",
         "closing": "يُرجى الاحتفاظ بهذه الرسالة للرجوع إليها.",
         "reminder": "تذكير من حولك: حان موعد تناول {name}. {instruction}",
+        "units": "عدد الحبات في كل جرعة: {count}.",
         "opening": "السلام عليكم{label}. معك حولك نيابةً عن فريق رعايتك لمتابعة حالتك بعد "
         "الخروج من المستشفى. سأطرح عليك أسئلة قصيرة، يُرجى الإجابة بنعم أو لا.",
         "question": "منذ خروجك من المستشفى، هل لاحظت: {item}؟",
@@ -112,7 +116,10 @@ class TemplateJourneyDrafter:
         lines = [text["greeting"].format(label=greeting)]
         if medications:
             lines.append(text["medicines"])
-            lines += [_sentence(f"{m['displayName']}: {m['doseInstruction']}") for m in medications]
+            lines += [
+                _sentence(f"{m['displayName']}: {m['doseInstruction']}") + _units(m, text)
+                for m in medications
+            ]
         if extraction.stopped_medications:
             items = text["list"].join(extraction.stopped_medications)
             lines.append(text["stopped"].format(items=items))
@@ -129,9 +136,12 @@ class TemplateJourneyDrafter:
         return JourneyDraft(
             voice_script="\n".join(lines),
             reminder_scripts={
-                m["medicationId"]: text["reminder"]
-                .format(name=m["displayName"], instruction=_sentence(m["doseInstruction"]))
-                .strip()
+                m["medicationId"]: (
+                    text["reminder"].format(
+                        name=m["displayName"], instruction=_sentence(m["doseInstruction"])
+                    )
+                    + _units(m, text)
+                ).strip()
                 for m in medications
             },
             call_opening=text["opening"].format(label=greeting),
@@ -165,7 +175,12 @@ class LiveJourneyDrafter:
                 else None
             ),
             "medications": [
-                {k: m[k] for k in ("medicationId", "displayName", "doseInstruction")}
+                {
+                    **{k: m[k] for k in ("medicationId", "displayName", "doseInstruction")},
+                    # Fixed fields: the model may say these, and may not work out its own.
+                    "unitsPerDose": dose_facts(m)["unitsPerDose"]["value"],
+                    "reminderTimes": dose_facts(m)["reminderTimes"]["value"],
+                }
                 for m in medications
             ],
             "stoppedMedications": extraction.stopped_medications,
@@ -205,7 +220,11 @@ def _identifying(note: str) -> bool:
 def guard_draft(draft: JourneyDraft, extraction: DischargeExtraction, medications: list) -> None:
     """Reject a draft that adds a number or drops a medicine or its dose numbers."""
     source = " ".join(
-        [extraction.text, *(f"{m['displayName']} {m['doseInstruction']}" for m in medications)]
+        [
+            extraction.text,
+            *(f"{m['displayName']} {m['doseInstruction']}" for m in medications),
+            *(_fixed_numbers(m) for m in medications),
+        ]
     )
     allowed = _numbers(source)
     texts = [draft.voice_script, draft.call_opening, draft.call_completion, draft.call_transfer]
@@ -288,6 +307,17 @@ def build_journey_drafter(settings) -> TemplateJourneyDrafter | LiveJourneyDraft
         )
         return LiveJourneyDrafter(model, settings.openai_text_model)
     return TemplateJourneyDrafter()
+
+
+def _units(medication: dict, text: dict) -> str:
+    """The calculated count as a fixed sentence; nothing when it is unknown."""
+    count = dose_facts(medication)["unitsPerDose"]["value"]
+    return f" {text['units'].format(count=count)}" if count else ""
+
+
+def _fixed_numbers(medication: dict) -> str:
+    facts = dose_facts(medication)
+    return f"{facts['unitsPerDose']['value'] or ''} {' '.join(facts['reminderTimes']['value'])}"
 
 
 def to_camel(name: str) -> str:

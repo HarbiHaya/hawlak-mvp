@@ -37,7 +37,8 @@ when you finish a milestone.
 | Intake, approval and scheduling rules | `apps/api/app/services/care_journey_service.py` |
 | PDF parsing | `apps/api/app/services/discharge_parser.py` |
 | Drafting and the fidelity guard | `apps/api/app/services/journey_drafter.py` |
-| Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v3.txt` |
+| Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v4.txt` |
+| Dose details with their source, tablet count, reminder times | `apps/api/app/services/dose_facts.py` |
 | Patient-text identifier gate | `apps/api/app/services/patient_identifiers.py` |
 | Medicine-photo label check and fixed replies | `apps/api/app/services/medicine_photos.py` |
 | Inbound WhatsApp (patient or caregiver) | `apps/api/app/services/inbound_workflow.py` |
@@ -75,6 +76,11 @@ pull request reviewed by both Haya and Retaj.
 - Generated drafts must pass `guard_draft`, which checks numbers, medicine names
   and doses. A draft that fails falls back to the template. Change the prompt by
   adding a new versioned file, not by editing the old one in place.
+- Tablet or capsule counts and reminder times come only from the fixed fields in
+  `dose_facts.py`, each with its source (`prescribed`, `calculated`,
+  `reminder_preference`, `unknown`). Code calculates; the model only phrases. Never
+  turn a frequency into a clock time or an interval, never offer part of a tablet,
+  and never fill in an `unknown`.
 - Patient-facing text never carries the registered full name, a phone number, a
   national or Iqama number, a member or policy number, the case ID or the
   source filename. `find_identifier` blocks approval when it finds one. Never
@@ -122,8 +128,9 @@ creates `* 2` duplicate files and folders. Never commit them. Delete them from
   paste keys into their local `.env` themselves.
 - The stack stays running unless Haya asks for cleanup.
 - WhatsApp sends free-form messages only within 24 hours of the patient's last
-  message. Until templates exist, the patient must message the business number
-  first.
+  message. The photo request goes as a template when
+  `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names one Meta has approved; everything else
+  still needs the patient to message the business number first.
 
 <!-- BEGIN AWS Agent Toolkit rules -->
 # AWS Guidance for the new AWS experience

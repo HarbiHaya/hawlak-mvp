@@ -34,6 +34,34 @@ async def test_send_text_posts_a_text_message_and_returns_its_id(fake_meta):
     }
 
 
+async def test_send_template_posts_the_named_template_with_its_body_values(fake_meta):
+    whatsapp, seen = fake_meta(httpx.Response(200, json={"messages": [{"id": "wamid.t"}]}))
+
+    message_id = await whatsapp.send_template(RECIPIENT, "photo_request", "ar", ["1", "2", "Zen"])
+
+    assert message_id == "wamid.t"
+    assert json.loads(seen[0].content) == {
+        "messaging_product": "whatsapp",
+        "recipient_type": "individual",
+        "to": "966500000000",
+        "type": "template",
+        "template": {
+            "name": "photo_request",
+            "language": {"code": "ar"},
+            "components": [
+                {
+                    "type": "body",
+                    "parameters": [
+                        {"type": "text", "text": "1"},
+                        {"type": "text", "text": "2"},
+                        {"type": "text", "text": "Zen"},
+                    ],
+                }
+            ],
+        },
+    }
+
+
 async def test_upload_audio_sends_the_ogg_file_as_multipart_and_returns_the_media_id(fake_meta):
     whatsapp, seen = fake_meta(httpx.Response(200, json={"id": "media-1"}))
 

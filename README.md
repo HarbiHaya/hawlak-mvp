@@ -61,14 +61,15 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
   - `provision.sh`
   - `deploy.sh`
   - `sync_keys.sh`, which pushes provider keys from `.env` to SSM and redeploys
-- Medicine-photo check:
-  - The patient, or a caregiver registered at intake, sends box photos on WhatsApp.
-  - In live mode, a vision model reads only the printed label. Code compares it with
-    the plan: matched, strength differs, not on the plan, or unreadable.
-  - The sender gets fixed replies only (photo n of total, retake, all received).
-  - A mismatch raises an alert. The insurer reviewer confirms or marks follow-up in
-    the Medicine photos tab, and the caregiver view shows each medicine's photo state.
-- Checks: API 227 tests, dashboard 20 tests, contracts 3 tests, typecheck and build.
+- Medicine-photo check ([design](docs/architecture/medicine-photo-check.md)):
+  - The insurer approves medicine names only; there is no image upload.
+  - After approval, Hawlak asks the patient (or the registered caregiver) to
+    photograph each approved box by name. Each photo links to that medicine by slot.
+  - In live mode, a low-detail vision read returns the printed label; code checks it
+    against that one medicine. Identical photos are read once.
+  - Fixed replies only. A mismatch alerts the reviewer, who confirms or marks
+    follow-up. Reminders then carry the patient's matched or confirmed box photo.
+- Checks: API 231 tests, dashboard 19 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 
@@ -84,7 +85,7 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
 - Reconcile Retaj's pharmacist-review dashboard (on `main` from PR #1) with this
   branch.
 - Contract review by Haya and Retaj of the new fields: `memberId`, `callPlan`
-  schedule, `insurance`, `generatedDraft`, `caregiverPhoneE164` and `medicinePhotos`.
+  schedule, `insurance`, `generatedDraft`, `caregiverPhoneE164`, `medicinePhotos` and the `photo_request` run.
 - OCR for scanned PDFs, and a real insurer integration in place of the mock.
 - Before any real data:
   - HTTPS from CloudFront to the origin.

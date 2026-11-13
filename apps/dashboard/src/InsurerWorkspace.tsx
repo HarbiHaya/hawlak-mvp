@@ -17,10 +17,10 @@ const labels = {
     schedule: "موعد مكالمة المتابعة", inHours: "بعد {n} ساعة من الاعتماد", pickDate: "تحديد تاريخ ووقت", firstCall: "موعد المكالمة الأولى", hoursAfter: "عدد الساعات بعد الاعتماد", repeat: "التكرار", occurrences: "عدد المكالمات", plannedCalls: "المواعيد المجدولة",
     opening: "افتتاحية المكالمة", questions: "أسئلة المتابعة", questionN: "السؤال {n}", addQuestion: "إضافة سؤال", completion: "ختام المكالمة",
     transfer: "نص التحويل إلى فريق الرعاية", responder: "رقم فريق الاستجابة", team: "جهة التحويل", approved: "معتمدة", pending: "بانتظار المراجعة",
-    rejected: "مرفوضة", approveImage: "اعتماد الصورة", noAlerts: "لا توجد تنبيهات مفتوحة.", open: "مفتوح", resolved: "تمت المعالجة",
+    rejected: "مرفوضة", noAlerts: "لا توجد تنبيهات مفتوحة.", open: "مفتوح", resolved: "تمت المعالجة",
     document: "ملخص الخروج", patient: "المريض", preferred: "صيغة المخاطبة", status: "حالة المراجعة", medicationName: "اسم الدواء",
     dose: "تعليمات الجرعة", reminder: "نص التذكير", dispensed: "تم صرف الدواء", enableReminder: "تفعيل تذكير الدواء",
-    uploadImage: "رفع صورة العبوة", uploadingImage: "جارٍ الرفع…", addMedication: "إضافة دواء", remove: "حذف", noMedications: "لم تُضف أدوية بعد. يجب إضافة دواء واحد على الأقل قبل الاعتماد.",
+    addMedication: "إضافة دواء", remove: "حذف", noMedications: "لم تُضف أدوية بعد. يجب إضافة دواء واحد على الأقل قبل الاعتماد.",
     queued: "اعتُمدت خطة المتابعة وجُدولت الرسائل والمكالمات للإرسال. رقم التسجيل في البرنامج: {ref}.", saved: "حُفظت المسودة.", openPdf: "فتح الملف في نافذة جديدة",
     extracted: "البيانات المستخرجة من ملخص الخروج", extractedMeds: "الأدوية", extractedStopped: "الأدوية الموقوفة", extractedNotes: "ملاحظات", fullText: "النص الكامل للملف",
     noText: "لا يحتوي الملف على نص قابل للقراءة، وقد يكون صورة ممسوحة ضوئياً. يُرجى إدخال المحتوى يدوياً.", unreadable: "تعذّرت قراءة الملف. يُرجى إدخال المحتوى يدوياً.", nothingFound: "لم يُعثر على قائمة أدوية في الملف. يُرجى إدخال الأدوية يدوياً.",
@@ -34,7 +34,8 @@ const labels = {
     policy: "رقم الوثيقة", plan: "فئة التغطية", network: "الشبكة الطبية", period: "فترة التغطية", programme: "البرنامج", programName: "برنامج الرعاية بعد الخروج", manager: "مدير الحالة", checkedAt: "تاريخ التحقق", enrollment: "رقم التسجيل في البرنامج",
     notChecked: "لم يُتحقق من أهلية العضو بعد. أدخل رقم العضوية للتحقق من التغطية قبل الاعتماد.", coverageSource: "المصدر: نظام الأعضاء لدى شركة التأمين (بيئة تجريبية).", notFoundHint: "لم يُعثر على رقم العضوية في نظام الأعضاء. يُرجى التحقق من الرقم مع المستشفى.", policyLapsed: "انتهت صلاحية الوثيقة",
     checked: "حُدّثت بيانات التغطية.", approvalRecord: "سجل الاعتماد", demoMode: "وضع العرض مفعّل: لا تُرسل رسائل واتساب ولا تُجرى مكالمات فعلياً، وإنما تُحاكى خطوات التنفيذ فقط. يتطلب الإرسال الفعلي ربط مزودي واتساب وتحويل النص إلى صوت والمكالمات.", simulated: "تمت المحاكاة — لم يُرسل فعلياً", approvedBy: "اعتمدها", approvedAt: "تاريخ الاعتماد", noRuns: "تظهر خطوات التنفيذ بعد اعتماد خطة المتابعة.",
-    photos: "صور الأدوية", noPhotos: "لم تصل صور علب أدوية من المريض أو مقدم الرعاية بعد.", photosNote: "يقرأ حولك النص المطبوع على العلبة فقط ويقارنه آلياً بالخطة المعتمدة. لا يُرسل للمريض أي حكم؛ القرار لك.",
+    patientPhoto: "الصورة من المريض بعد الاعتماد.", photoAfterApproval: "بعد الاعتماد يطلب حولك من المريض تصوير هذه العلبة باسمها المعتمد.",
+    photos: "صور الأدوية", noPhotos: "لم تصل صور علب أدوية من المريض أو مقدم الرعاية بعد.", photosNote: "يطلب حولك صورة كل دواء معتمد باسمه، فترتبط كل صورة بدوائها. يُقرأ النص المطبوع على العلبة فقط ويُقارن آلياً بذلك الدواء. لا يُرسل للمريض أي حكم؛ القرار لك.",
     sentBy: "أرسلها", fromPatient: "المريض", fromCaregiver: "مقدم الرعاية", label: "المكتوب على العلبة", planned: "الدواء في الخطة", notRead: "لم تُقرأ",
     confirmPhoto: "تأكيد المطابقة", followUp: "يحتاج متابعة", reviewed: "راجعها {who}", reviewFailed: "تعذّر حفظ المراجعة.",
   },
@@ -47,10 +48,10 @@ const labels = {
     schedule: "Follow-up call schedule", inHours: "{n} hours after approval", pickDate: "Select date and time", firstCall: "First call", hoursAfter: "Hours after approval", repeat: "Repeat", occurrences: "Number of calls", plannedCalls: "Scheduled calls",
     opening: "Call opening", questions: "Follow-up questions", questionN: "Question {n}", addQuestion: "Add question", completion: "Call closing",
     transfer: "Transfer to care team message", responder: "Responder phone number", team: "Transfer destination", approved: "Approved", pending: "Pending review",
-    rejected: "Rejected", approveImage: "Approve image", noAlerts: "There are no open alerts.", open: "Open", resolved: "Resolved",
+    rejected: "Rejected", noAlerts: "There are no open alerts.", open: "Open", resolved: "Resolved",
     document: "Discharge summary", patient: "Patient", preferred: "Form of address", status: "Review status", medicationName: "Medication name",
     dose: "Dose instruction", reminder: "Reminder text", dispensed: "Medication dispensed", enableReminder: "Enable medication reminder",
-    uploadImage: "Upload package image", uploadingImage: "Uploading…", addMedication: "Add medication", remove: "Remove", noMedications: "No medications have been added. At least one medication is required before approval.",
+    addMedication: "Add medication", remove: "Remove", noMedications: "No medications have been added. At least one medication is required before approval.",
     queued: "The follow-up plan is approved and messages and calls are scheduled. Programme enrolment reference: {ref}.", saved: "Draft saved.", openPdf: "Open in a new window",
     extracted: "Information extracted from the discharge summary", extractedMeds: "Medications", extractedStopped: "Stopped medications", extractedNotes: "Notes", fullText: "Full document text",
     noText: "The file contains no readable text and may be a scanned image. Enter the content manually.", unreadable: "The file could not be read. Enter the content manually.", nothingFound: "No medication list was found in the file. Enter the medications manually.",
@@ -64,7 +65,8 @@ const labels = {
     policy: "Policy number", plan: "Plan", network: "Provider network", period: "Coverage period", programme: "Programme", programName: "Post-discharge care programme", manager: "Case manager", checkedAt: "Verified on", enrollment: "Programme enrolment reference",
     notChecked: "Eligibility has not been verified. Enter the member ID to verify coverage before approval.", coverageSource: "Source: insurer member system (demo environment).", notFoundHint: "The member ID was not found in the member system. Confirm the ID with the hospital.", policyLapsed: "Policy lapsed",
     checked: "Coverage information updated.", approvalRecord: "Approval record", demoMode: "Demo mode is on: no WhatsApp messages are sent and no calls are placed; delivery steps are only simulated. Real delivery requires connecting the WhatsApp, text-to-speech and calling providers.", simulated: "Simulated — not actually sent", approvedBy: "Approved by", approvedAt: "Approved on", noRuns: "Delivery steps appear once the follow-up plan is approved.",
-    photos: "Medicine photos", noPhotos: "No medicine-box photos have arrived from the patient or caregiver yet.", photosNote: "Hawlak reads only the text printed on the box and compares it with the approved plan in code. The patient is never told a verdict; the decision is yours.",
+    patientPhoto: "Photo sent by the patient after approval.", photoAfterApproval: "After approval, Hawlak asks the patient to photograph this box by its approved name.",
+    photos: "Medicine photos", noPhotos: "No medicine-box photos have arrived from the patient or caregiver yet.", photosNote: "Hawlak asks for each approved medicine by name, so every photo is linked to its medicine. Only the printed label is read and compared in code with that medicine. The patient is never told a verdict; the decision is yours.",
     sentBy: "Sent by", fromPatient: "Patient", fromCaregiver: "Caregiver", label: "Printed on the box", planned: "Planned medicine", notRead: "Not read",
     confirmPhoto: "Confirm match", followUp: "Needs follow-up", reviewed: "Reviewed by {who}", reviewFailed: "The review could not be saved.",
   },
@@ -77,8 +79,9 @@ const dialectLabel: Record<string, { ar: string; en: string }> = {
 };
 const runKindLabel: Record<string, { ar: string; en: string }> = {
   discharge_voice_note: { ar: "رسالة الخروج الصوتية عبر واتساب", en: "WhatsApp discharge voice message" },
-  medication_reminder: { ar: "تذكير الدواء مع صورة العبوة", en: "Medication reminder with package image" },
+  medication_reminder: { ar: "تذكير الدواء (مع صورة العلبة بعد وصولها)", en: "Medication reminder (with the box photo once received)" },
   follow_up_call: { ar: "مكالمة المتابعة", en: "Follow-up call" },
+  photo_request: { ar: "طلب تصوير علب الأدوية عبر واتساب", en: "WhatsApp request to photograph medicine boxes" },
 };
 const runStatusLabel: Record<string, { ar: string; en: string }> = {
   pending: { ar: "مجدولة", en: "Scheduled" }, claimed: { ar: "قيد الإرسال", en: "Sending" }, sent: { ar: "أُرسلت", en: "Sent" },
@@ -93,7 +96,8 @@ const alertTypeLabel: Record<string, { ar: string; en: string }> = {
 const photoCheckLabel: Record<PhotoCheckStatus, { ar: string; en: string }> = {
   matched: { ar: "مطابقة للخطة", en: "Matches the plan" },
   strength_mismatch: { ar: "التركيز مختلف عن الخطة", en: "Strength differs from the plan" },
-  not_in_plan: { ar: "ليست في الخطة المعتمدة", en: "Not on the approved plan" },
+  different_medicine: { ar: "دواء مختلف عن المطلوب", en: "Different from the requested medicine" },
+  extra: { ar: "صورة إضافية", en: "Extra photo" },
   unreadable: { ar: "الصورة غير واضحة", en: "Photo not readable" },
   not_checked: { ar: "بانتظار مراجعتك", en: "Awaiting your check" },
 };
@@ -250,24 +254,6 @@ export function InsurerWorkspace({ api, locale, section, reviewer }: { api: Hawl
     setDetail({ ...detail, medications: [...detail.medications, medication] });
   }
 
-  async function uploadMedicationImage(medicationId: string, image: File) {
-    if (!detail || detail.reviewStatus === "approved") return;
-    setError(null);
-    try {
-      const stored = await api.uploadMedicationImage(detail.caseId, image);
-      updateMedication(medicationId, {
-        image: {
-          source: "catalog",
-          objectKey: stored.objectKey,
-          reviewStatus: "pending",
-        },
-      });
-    } catch (caught) {
-      setError(displayError(caught, locale));
-      throw caught;
-    }
-  }
-
   const filtered = cases.filter((item) => `${item.patientName} ${item.caseId}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const tabs: Array<{ value: Tab; label: string }> = [
     { value: "source", label: t.source }, { value: "coverage", label: t.coverage }, { value: "content", label: t.content },
@@ -283,7 +269,7 @@ export function InsurerWorkspace({ api, locale, section, reviewer }: { api: Hawl
       <section className="case-detail">{loading && !detail ? <div className="detail-loading" /> : detail && <>
         <header className="case-detail__header"><div><span>{detail.caseId}</span><h2>{detail.patientName}</h2>{detail.preferredFormOfAddress && <p>{t.preferred}: {detail.preferredFormOfAddress}</p>}</div><div className="case-detail__chips">{detail.insurance && <i className={`status status--coverage-${detail.insurance.status}`}>{coverageLabel(detail.insurance, locale)}</i>}<i className={`status status--${detail.reviewStatus}`}>{statusLabel[detail.reviewStatus][locale]}</i></div></header>
         <nav className="tabs" aria-label={t.caseDetails}>{tabs.map((item) => <button key={item.value} className={tab === item.value ? "active" : ""} onClick={() => setTab(item.value)}>{item.label}</button>)}</nav>
-        <div className="tab-panel">{(tab === "content" || tab === "medications") && <DraftBanner detail={detail} locale={locale} busy={action === "draft"} onGenerate={() => void regenerate()} />}{tab === "source" && <SourceTab api={api} detail={detail} locale={locale} />}{tab === "coverage" && <CoverageTab detail={detail} locale={locale} busy={action === "eligibility"} onCheck={(memberId) => void checkEligibility(memberId)} />}{tab === "content" && <ContentTab detail={detail} locale={locale} onChange={setDetail} />}{tab === "medications" && <MedicationsTab api={api} detail={detail} locale={locale} onUpdate={updateMedication} onUpload={uploadMedicationImage} onAdd={addMedication} onRemove={(id) => setDetail({ ...detail, medications: detail.medications.filter((item) => item.medicationId !== id) })} />}{tab === "photos" && <PhotosTab api={api} detail={detail} locale={locale} onReview={(id, decision) => void reviewPhoto(id, decision)} />}{tab === "journey" && <JourneyTab detail={detail} locale={locale} />}</div>
+        <div className="tab-panel">{(tab === "content" || tab === "medications") && <DraftBanner detail={detail} locale={locale} busy={action === "draft"} onGenerate={() => void regenerate()} />}{tab === "source" && <SourceTab api={api} detail={detail} locale={locale} />}{tab === "coverage" && <CoverageTab detail={detail} locale={locale} busy={action === "eligibility"} onCheck={(memberId) => void checkEligibility(memberId)} />}{tab === "content" && <ContentTab detail={detail} locale={locale} onChange={setDetail} />}{tab === "medications" && <MedicationsTab api={api} detail={detail} locale={locale} onUpdate={updateMedication} onAdd={addMedication} onRemove={(id) => setDetail({ ...detail, medications: detail.medications.filter((item) => item.medicationId !== id) })} />}{tab === "photos" && <PhotosTab api={api} detail={detail} locale={locale} onReview={(id, decision) => void reviewPhoto(id, decision)} />}{tab === "journey" && <JourneyTab detail={detail} locale={locale} />}</div>
         <footer className="case-actions"><button className="button" disabled={!!action || detail.reviewStatus === "approved"} onClick={() => void saveContent()}>{action === "save" ? t.saving : t.save}</button><button className="button button--primary" disabled={!!action || detail.reviewStatus === "approved"} onClick={() => void approve()}>{action === "approve" ? t.approving : t.approve}</button></footer>
       </>}</section>
     </div>}
@@ -404,23 +390,24 @@ function CallSchedule({ plan, locked, locale, onChange }: { plan: CallPlan; lock
   </fieldset>;
 }
 
-function MedicationsTab({ api, detail, locale, onUpdate, onUpload, onAdd, onRemove }: { api: HawlakApi; detail: WorkspaceCaseDetail; locale: Locale; onUpdate: (id: string, change: Partial<WorkspaceMedication>) => void; onUpload: (id: string, image: File) => Promise<void>; onAdd: () => void; onRemove: (id: string) => void }) {
+function MedicationsTab({ api, detail, locale, onUpdate, onAdd, onRemove }: { api: HawlakApi; detail: WorkspaceCaseDetail; locale: Locale; onUpdate: (id: string, change: Partial<WorkspaceMedication>) => void; onAdd: () => void; onRemove: (id: string) => void }) {
   const t = labels[locale];
   const locked = detail.reviewStatus === "approved";
-  const [uploadingId, setUploadingId] = useState<string | null>(null);
+  // The patient photographs each approved box after approval; the latest one shows here.
+  const patientPhoto = (id: string) => [...(detail.medicinePhotos ?? [])].reverse().find((photo) => photo.medicationId === id && photo.checkStatus !== "unreadable");
   return <div className="medication-grid">
     {detail.medications.length === 0 && <div className="compact-empty">{t.noMedications}</div>}
     {detail.medications.map((item) => <article className="medication-editor" key={item.medicationId}>
-      <MedicineImage api={api} caseId={detail.caseId} objectKey={item.image?.objectKey} alt={item.displayName} empty={t.noImage} />
+      <MedicineImage api={api} caseId={detail.caseId} objectKey={patientPhoto(item.medicationId)?.objectKey ?? item.image?.objectKey} alt={item.displayName} empty={t.noImage} />
       <div className="medication-fields">
         <label>{t.medicationName}<input disabled={locked} value={item.displayName} onChange={(event) => onUpdate(item.medicationId, { displayName: event.target.value })} /></label>
         <label>{t.dose}<input disabled={locked} value={item.doseInstruction} onChange={(event) => onUpdate(item.medicationId, { doseInstruction: event.target.value })} /></label>
         <label className="field-span"><span className="label-row">{t.reminder}<OriginBadge origin={originOf(item.reminderScript, detail.generatedDraft?.reminderScripts[item.medicationId])} locale={locale} /></span><input dir="auto" disabled={locked} value={item.reminderScript} onChange={(event) => onUpdate(item.medicationId, { reminderScript: event.target.value })} /></label>
         <label className="checkbox-field"><input type="checkbox" disabled={locked} checked={item.dispensed} onChange={(event) => onUpdate(item.medicationId, { dispensed: event.target.checked, reminderEnabled: event.target.checked ? item.reminderEnabled : false })} />{t.dispensed}</label>
         <label className="checkbox-field"><input type="checkbox" disabled={locked || !item.dispensed} checked={item.reminderEnabled} onChange={(event) => onUpdate(item.medicationId, { reminderEnabled: event.target.checked })} />{t.enableReminder}</label>
-        {item.image && <span className={`image-state image-state--${item.image.reviewStatus === "pending" ? "candidate" : item.image.reviewStatus}`}>{item.image.reviewStatus === "approved" ? t.approved : item.image.reviewStatus === "pending" ? t.pending : t.rejected}</span>}
+        {item.dispensed && <span className="field-hint field-span">{patientPhoto(item.medicationId) ? t.patientPhoto : t.photoAfterApproval}</span>}
       </div>
-      <div className="medication-actions">{!locked && <label className="button medication-upload">{uploadingId === item.medicationId ? t.uploadingImage : t.uploadImage}<input type="file" accept="image/jpeg,image/png,image/webp" disabled={uploadingId !== null} onChange={(event) => { const file = event.target.files?.[0]; if (!file) return; setUploadingId(item.medicationId); void onUpload(item.medicationId, file).finally(() => setUploadingId(null)); }} /></label>}{item.image?.reviewStatus === "pending" && !locked && <button className="button" onClick={() => onUpdate(item.medicationId, { image: { ...item.image!, reviewStatus: "approved" } })}>{t.approveImage}</button>}{!locked && <button className="button" onClick={() => onRemove(item.medicationId)}>{t.remove}</button>}</div>
+      {!locked && <div className="medication-actions"><button className="button" onClick={() => onRemove(item.medicationId)}>{t.remove}</button></div>}
     </article>)}
     {!locked && <button className="button medication-add" onClick={onAdd}>+ {t.addMedication}</button>}
   </div>;

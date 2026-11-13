@@ -17,7 +17,7 @@ from app.models import (
     new_id,
 )
 from app.schemas.review_event import PharmacistReviewRequested
-from app.services.medicine_photos import PHOTO_REPLIES, LabelReading, compare_reading
+from app.services.medicine_photos import MISMATCH, LabelReading, compare_reading, reply
 from app.services.object_storage import ObjectStorageError
 from app.services.whatsapp_client import WhatsAppApiError, WhatsAppMediaError
 
@@ -333,50 +333,41 @@ class InboundWorkflow:
         return event
 
     async def _check_photo(self, media, patient_case, journey, downloaded) -> None:
-        """Read the label, compare it with the plan in code, alert a person, send a fixed reply."""
-        reading = None
-        if self.reader is not None:
-            try:
-                reading = await self.reader.read(downloaded.content, downloaded.mime_type)
-            except Exception as exc:  # noqa: BLE001 - a failed read leaves the photo for a person
-                logger.warning("Medicine label read failed error_type=%s", type(exc).__name__)
-        status, medication_id = compare_reading(reading, journey.medications)
-        media.label_reading = reading.to_json() if reading and reading.readable else None
+        """Link the photo to the medicine Hawlak asked for, check the label against that one
+        medicine, alert a person on a mismatch, then ask for the next box with a fixed reply."""
+        dispensed = [m for m in journey.medications if m["dispensed"]]
+        earlier = [p for p in self._case_photos(patient_case.id) if p.id != media.id]
+        accepted = {p.medication_id for p in earlier if p.check_status not in (None, "unreadable")}
+        expected = next((m for m in dispensed if m["medicationId"] not in accepted), None)
+        language = journey.language_code
+        if expected is None:
+            # Every requested box already arrived: keep the photo for a person, skip the read.
+            media.check_status = "extra"
+            self.session.commit()
+            await self._reply(patient_case, media, reply(language, "received_extra"))
+            return
+
+        reading = await self._read_once(earlier, media, downloaded)
+        status = compare_reading(reading, expected)
+        media.medication_id = expected["medicationId"]
+        media.label_reading = reading.to_json() if reading else None
         media.check_status = status
-        media.medication_id = medication_id
-        if status in {"strength_mismatch", "not_in_plan"}:
-            planned = next(
-                (
-                    m["displayName"]
-                    for m in journey.medications
-                    if m["medicationId"] == medication_id
-                ),
-                None,
-            )
+        if status in MISMATCH:
             summary = (
-                f"Medicine photo strength differs from the plan: {planned}"
-                if planned
-                else "Medicine photo is not on the approved plan"
+                f"Medicine photo does not match the requested medicine: {expected['displayName']}"
             )
             self._add_alert(patient_case.id, "medicine_photo_mismatch", "high", summary, media.id)
-        self.session.commit()
-
-        replies = PHOTO_REPLIES.get(journey.language_code, PHOTO_REPLIES["ar"])
-        counted = (
-            self.session.scalar(
-                select(func.count(InboundMedia.id)).where(
-                    InboundMedia.case_id == patient_case.id,
-                    InboundMedia.processing_status == "stored",
-                    InboundMedia.check_status != "unreadable",
-                )
-            )
-            or 0
-        )
-        total = sum(1 for m in journey.medications if m["dispensed"])
         if status == "unreadable":
-            text = replies["retake"]
-        elif total and counted == total:
-            text = replies["complete"]
+            self.session.commit()
+            await self._reply(
+                patient_case, media, reply(language, "retake", name=expected["displayName"])
+            )
+            return
+
+        accepted.add(expected["medicationId"])
+        following = next((m for m in dispensed if m["medicationId"] not in accepted), None)
+        if following is None:
+            text = reply(language, "complete")
             self._add_alert(
                 patient_case.id,
                 "medicine_photos_ready",
@@ -384,11 +375,43 @@ class InboundWorkflow:
                 "Medicine photos received for every dispensed medicine",
                 "ready",
             )
-            self.session.commit()
-        elif total and counted < total:
-            text = replies["received"].format(n=counted, total=total)
         else:
-            text = replies["received_extra"]
+            text = reply(
+                language,
+                "next",
+                n=dispensed.index(following) + 1,
+                total=len(dispensed),
+                name=following["displayName"],
+            )
+        self.session.commit()
+        await self._reply(patient_case, media, text)
+
+    async def _read_once(self, earlier, media, downloaded) -> LabelReading | None:
+        """Reuse the reading of an identical photo; otherwise read the label once."""
+        same = next(
+            (p for p in earlier if p.object_sha256 == media.object_sha256 and p.label_reading),
+            None,
+        )
+        if same is not None:
+            return LabelReading(**same.label_reading)
+        if self.reader is None:
+            return None
+        try:
+            return await self.reader.read(downloaded.content, downloaded.mime_type)
+        except Exception as exc:  # noqa: BLE001 - a failed read leaves the photo for a person
+            logger.warning("Medicine label read failed error_type=%s", type(exc).__name__)
+            return None
+
+    def _case_photos(self, case_id: str) -> list[InboundMedia]:
+        return list(
+            self.session.scalars(
+                select(InboundMedia)
+                .where(InboundMedia.case_id == case_id, InboundMedia.processing_status == "stored")
+                .order_by(InboundMedia.received_at, InboundMedia.id)
+            )
+        )
+
+    async def _reply(self, patient_case, media, text: str) -> None:
         recipient = (
             patient_case.caregiver_phone_e164
             if media.sender_role == "caregiver" and patient_case.caregiver_phone_e164

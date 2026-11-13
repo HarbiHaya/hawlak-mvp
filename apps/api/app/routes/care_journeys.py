@@ -29,12 +29,6 @@ from app.services.object_storage import ObjectStorageError, StorageDep
 
 router = APIRouter()
 MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
-MAX_MEDICATION_IMAGE_BYTES = 10 * 1024 * 1024
-MEDICATION_IMAGE_TYPES = {
-    "image/jpeg": (b"\xff\xd8\xff",),
-    "image/png": (b"\x89PNG\r\n\x1a\n",),
-    "image/webp": (b"RIFF",),
-}
 FILE_TYPES = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg"}
 FILE_TYPES |= {".jpeg": "image/jpeg", ".webp": "image/webp"}
 
@@ -81,45 +75,6 @@ async def upload_discharge_document(
     except ObjectStorageError:
         return JSONResponse(status_code=503, content={"error": "storage_unavailable"})
     return {"objectKey": stored.key, "filename": filename}
-
-
-@router.post("/workspace/cases/{case_id}/medication-images", status_code=201)
-async def upload_medication_image(
-    case_id: str,
-    request: Request,
-    storage: StorageDep,
-    session: SessionDep,
-    filename: Annotated[str, Header(alias="X-Filename", min_length=3, max_length=255)],
-):
-    if session.get(CareJourney, case_id) is None:
-        return JSONResponse(status_code=404, content={"error": "case_not_found"})
-    content_type = request.headers.get("content-type", "").split(";", 1)[0].lower()
-    signatures = MEDICATION_IMAGE_TYPES.get(content_type)
-    if signatures is None:
-        return JSONResponse(status_code=415, content={"error": "image_required"})
-    content = await request.body()
-    if not content or len(content) > MAX_MEDICATION_IMAGE_BYTES:
-        return JSONResponse(status_code=413, content={"error": "image_size_invalid"})
-    if content_type == "image/webp":
-        valid_signature = content.startswith(b"RIFF") and content[8:12] == b"WEBP"
-    else:
-        valid_signature = any(content.startswith(signature) for signature in signatures)
-    if not valid_signature:
-        return JSONResponse(status_code=422, content={"error": "invalid_image"})
-    try:
-        stored = storage.store_case_media(
-            case_id=case_id,
-            content=content,
-            content_type=content_type,
-            source_media_id=filename,
-        )
-    except ObjectStorageError:
-        return JSONResponse(status_code=503, content={"error": "storage_unavailable"})
-    return {
-        "objectKey": stored.key,
-        "filename": filename,
-        "contentType": content_type,
-    }
 
 
 @router.post("/workspace/cases", status_code=201)

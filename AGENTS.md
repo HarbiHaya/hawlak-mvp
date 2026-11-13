@@ -61,10 +61,13 @@ pull request reviewed by both Haya and Retaj.
 - Clinical content comes only from the approved plan. Nothing reaches a patient
   until its exact script is approved.
 - Never log tokens or full phone numbers (last 4 digits only).
-- Medicine photos: the vision model reads only the printed label (name, strength,
-  form). Code, not the model, compares it with the approved plan. The sender gets
-  only the fixed replies in `PHOTO_REPLIES`, never a verdict; a mismatch becomes an
-  alert for a person, who confirms or follows up.
+- Medicine photos come only from the patient or the registered caregiver, never
+  the insurer. Hawlak asks for each approved medicine by name, and each photo is
+  linked to the medicine it was requested for (its slot), never by model guess.
+  The vision model reads only the printed label; code compares it with that one
+  medicine. Senders get only the fixed replies in `PHOTO_REPLIES`, never a
+  verdict; a mismatch becomes an alert for a person. Design:
+  [`docs/architecture/medicine-photo-check.md`](docs/architecture/medicine-photo-check.md).
 - `apps/api` holds no UI code. `apps/dashboard` holds no AI, WhatsApp, database
   or storage code; it only calls the API.
 - Generated drafts must pass `guard_draft`, which checks numbers, medicine names

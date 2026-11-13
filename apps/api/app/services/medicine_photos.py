@@ -1,8 +1,9 @@
 """Check a medicine-box photo against the approved plan, without advising anyone.
 
-A vision model reads only what is printed on the box (name, strength, form). Code, not the
-model, compares that reading with the approved medicines. The sender only ever gets one of
-the fixed replies below; a mismatch goes to a person as an alert.
+Hawlak asks for the approved medicines one at a time, so each photo is linked to the
+medicine it was requested for (its slot), never by model guess. A vision model then reads
+only what is printed on the box, and code checks it against that one medicine. The sender
+only ever gets one of the fixed replies below; a mismatch goes to a person as an alert.
 """
 
 import asyncio
@@ -14,22 +15,27 @@ from pathlib import Path
 
 PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "medicine-label-v1.txt"
 
-# Fixed, pre-approved replies. They never name a medicine, a dose or a judgement.
+# Fixed replies. {name} is only ever an insurer-approved medicine name; no reply gives a
+# verdict on the photo.
 PHOTO_REPLIES = {
     "ar": {
-        "received": "وصلت صورة العلبة {n} من {total}، شكراً.",
-        "received_extra": "وصلت الصورة، شكراً.",
-        "retake": "الصورة غير واضحة. فضلاً صوّر اسم الدواء المكتوب على العلبة مرة ثانية.",
+        "request": "فضلاً صوّر علبة الدواء {n} من {total}: {name}، وأرسل الصورة هنا.",
+        "next": "وصلت الصورة، شكراً. الآن صوّر علبة الدواء {n} من {total}: {name}.",
+        "retake": "الصورة غير واضحة. فضلاً صوّر اسم الدواء المكتوب على علبة {name} مرة ثانية.",
         "complete": "شكراً، وصلت صور كل الأدوية. بيراجعها الصيدلي ويتواصل معكم إذا احتاج.",
+        "received_extra": "وصلت الصورة، شكراً.",
     },
     "en": {
-        "received": "Photo {n} of {total} received, thank you.",
-        "received_extra": "Photo received, thank you.",
-        "retake": "The photo is not clear. Please photograph the medicine name on the box again.",
+        "request": "Please photograph medicine box {n} of {total}: {name}, and send it here.",
+        "next": "Photo received, thank you. Now photograph medicine box {n} of {total}: {name}.",
+        "retake": "The photo is not clear. Please photograph the name printed on the {name} "
+        "box again.",
         "complete": "Thank you, photos of all medicines arrived. A pharmacist will review them "
         "and contact you if needed.",
+        "received_extra": "Photo received, thank you.",
     },
 }
+MISMATCH = {"strength_mismatch", "different_medicine"}
 
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "01234567890123456789")
 _DOSE = re.compile(r"(\d+(?:\.\d+)?)\s*(mcg|µg|mg|g|ml|iu|units?|%)", re.I)
@@ -45,7 +51,7 @@ class LabelReading:
     form: str | None
 
     def to_json(self) -> dict:
-        return {k: v for k, v in asdict(self).items() if k != "readable"}
+        return asdict(self)
 
 
 def _doses(text: str) -> set[str]:
@@ -58,27 +64,35 @@ def _words(text: str) -> set[str]:
     return {w.casefold() for w in _WORD.findall(text)} - _UNITS
 
 
-def compare_reading(
-    reading: LabelReading | None, medications: list[dict]
-) -> tuple[str, str | None]:
-    """Return (status, medicationId). Statuses: matched, strength_mismatch, not_in_plan,
-    unreadable, not_checked (no reader configured, so a person checks it)."""
+def compare_reading(reading: LabelReading | None, medication: dict) -> str:
+    """Check the box against the one medicine it was requested for. Returns matched,
+    strength_mismatch, different_medicine, unreadable, or not_checked (no reader, so a
+    person checks it)."""
     if reading is None:
-        return "not_checked", None
+        return "not_checked"
     if not reading.readable or not reading.name:
-        return "unreadable", None
-    name_words = _words(reading.name)
+        return "unreadable"
+    # ponytail: word overlap with the approved display name; an Arabic-only plan name will not
+    # match a Latin box and lands in different_medicine, which a person then reviews.
+    if not _words(reading.name) & _words(medication["displayName"]):
+        return "different_medicine"
     label_doses = _doses(f"{reading.name} {reading.strength or ''}")
-    for medication in medications:
-        # ponytail: word overlap on the plan's display name; an Arabic-only plan name will not
-        # match a Latin box and lands in not_in_plan, which a person then reviews.
-        if not name_words & _words(medication["displayName"]):
-            continue
-        plan_doses = _doses(f"{medication['displayName']} {medication['doseInstruction']}")
-        if label_doses and plan_doses and not label_doses & plan_doses:
-            return "strength_mismatch", medication["medicationId"]
-        return "matched", medication["medicationId"]
-    return "not_in_plan", None
+    plan_doses = _doses(f"{medication['displayName']} {medication['doseInstruction']}")
+    if label_doses and plan_doses and not label_doses & plan_doses:
+        return "strength_mismatch"
+    return "matched"
+
+
+def reply(language: str, kind: str, **values) -> str:
+    return PHOTO_REPLIES.get(language, PHOTO_REPLIES["ar"])[kind].format(**values)
+
+
+def photo_request_text(medications: list[dict], language: str) -> str | None:
+    """The first request, sent after approval. None when no medicine was dispensed."""
+    dispensed = [m for m in medications if m["dispensed"]]
+    if not dispensed:
+        return None
+    return reply(language, "request", n=1, total=len(dispensed), name=dispensed[0]["displayName"])
 
 
 class OpenAILabelReader:
@@ -108,7 +122,13 @@ class OpenAILabelReader:
         response = self._client.responses.create(
             model=self._model,
             instructions=PROMPT_PATH.read_text(encoding="utf-8"),
-            input=[{"role": "user", "content": [{"type": "input_image", "image_url": image}]}],
+            # Low detail keeps each read to a small fixed image budget; box print is large text.
+            input=[
+                {
+                    "role": "user",
+                    "content": [{"type": "input_image", "image_url": image, "detail": "low"}],
+                }
+            ],
             text={
                 "format": {
                     "type": "json_schema",

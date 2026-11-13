@@ -21,6 +21,7 @@ from app.schemas.care_journey import (
 )
 from app.services.discharge_parser import DischargeExtraction, draft_medications
 from app.services.insurer_systems import MockInsurerSystems
+from app.services.medicine_photos import MISMATCH
 from app.services.patient_identifiers import find_identifier
 
 REPEAT_DAYS = {"none": 0, "daily": 1, "every_2_days": 2, "weekly": 7}
@@ -224,6 +225,9 @@ class CareJourneyService:
                         approved_at,
                     )
                 )
+        if any(medication["dispensed"] for medication in journey.medications):
+            # The patient photographs each approved box; see medicine_photos.
+            runs.append(self._run(case_id, "photo_request", "medicinePhotos", approved_at))
         if journey.call_plan["enabled"]:
             for index, scheduled_at in enumerate(self._call_times(journey.call_plan, approved_at)):
                 ref = "callPlan" if index == 0 else f"callPlan:{index + 1}"
@@ -460,7 +464,11 @@ class CareJourneyService:
             "sender": photo.sender_role,
             "receivedAt": photo.received_at,
             "objectKey": photo.object_key,
-            "reading": photo.label_reading,
+            "reading": (
+                {k: photo.label_reading[k] for k in ("name", "strength", "form")}
+                if photo.label_reading and photo.label_reading.get("readable", True)
+                else None
+            ),
             "checkStatus": photo.check_status or "not_checked",
             "medicationId": photo.medication_id,
             "reviewStatus": photo.review_status,
@@ -486,9 +494,9 @@ class CareJourneyService:
         latest = mine[-1]
         if latest.review_status == "confirmed":
             return "confirmed"
-        if latest.review_status == "follow_up" or latest.check_status == "strength_mismatch":
+        if latest.review_status == "follow_up" or latest.check_status in MISMATCH:
             return "needs_attention"
-        return "received"
+        return "missing" if latest.check_status == "unreadable" else "received"
 
     def caregiver(self, case_id: str) -> dict:
         journey, patient = self._get(case_id)
@@ -568,9 +576,6 @@ class CareJourneyService:
             if medication["dispensed"] and medication["reminderEnabled"]:
                 if not medication["reminderScript"].strip():
                     return "reminder_script_required"
-                image = medication.get("image")
-                if not image or image.get("reviewStatus") != "approved":
-                    return "medication_image_requires_review"
         if voice.get("enabled") and not voice.get("script", "").strip():
             return "voice_script_required"
         if call.get("enabled"):

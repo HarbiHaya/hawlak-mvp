@@ -229,30 +229,6 @@ describe("HawlakApi", () => {
     expect(new Headers(init?.headers).has("Authorization")).toBe(false);
   });
 
-  it("uploads a reviewed medication image through the case interface", async () => {
-    const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
-      new Response(
-        JSON.stringify({
-          objectKey: "cases/case-1/media/medicine.jpg",
-          filename: "medicine.jpg",
-          contentType: "image/jpeg",
-        }),
-        { status: 201, headers: { "Content-Type": "application/json" } },
-      ),
-    );
-    const api = new HawlakApi("/api", "", fetcher);
-    const image = new File(["synthetic"], "medicine.jpg", { type: "image/jpeg" });
-
-    const result = await api.uploadMedicationImage("case-1", image);
-
-    expect(result.objectKey).toBe("cases/case-1/media/medicine.jpg");
-    const [url, init] = fetcher.mock.calls[0] ?? [];
-    expect(url).toBe("/api/internal/workspace/cases/case-1/medication-images");
-    expect(init?.body).toBe(image);
-    expect(new Headers(init?.headers).get("Content-Type")).toBe("image/jpeg");
-    expect(new Headers(init?.headers).get("X-Filename")).toBe("medicine.jpg");
-  });
-
   it("records a pharmacist's decision on a medicine-box photo", async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(JSON.stringify({ id: "photo-1", reviewStatus: "confirmed" }), {

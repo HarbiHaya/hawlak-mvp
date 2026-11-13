@@ -115,7 +115,7 @@ export interface CallPlan {
 
 export interface DeliveryRun {
   id: string;
-  kind: "discharge_voice_note" | "medication_reminder" | "follow_up_call";
+  kind: "discharge_voice_note" | "medication_reminder" | "follow_up_call" | "photo_request";
   status: string;
   scheduledAt: string;
   providerRef?: string | null;
@@ -140,7 +140,8 @@ export interface WorkspaceCaseDetail extends WorkspaceCaseSummary {
 export type PhotoCheckStatus =
   | "matched"
   | "strength_mismatch"
-  | "not_in_plan"
+  | "different_medicine"
+  | "extra"
   | "unreadable"
   | "not_checked";
 
@@ -427,23 +428,6 @@ export class HawlakApi {
     return this.request(`/internal/workspace/alerts/${encodeURIComponent(alertId)}/resolve`, {
       method: "POST",
     });
-  }
-
-  uploadMedicationImage(
-    caseId: string,
-    image: File,
-  ): Promise<{ objectKey: string; filename: string; contentType: string }> {
-    return this.request(
-      `/internal/workspace/cases/${encodeURIComponent(caseId)}/medication-images`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": image.type,
-          "X-Filename": image.name,
-        },
-        body: image,
-      },
-    );
   }
 
   updateWorkspaceContent(

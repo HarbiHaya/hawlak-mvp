@@ -96,7 +96,8 @@ class DeliveryRun(Base):
     __table_args__ = (
         UniqueConstraint("idempotency_key", name="uq_delivery_runs_idempotency_key"),
         CheckConstraint(
-            "kind IN ('discharge_voice_note', 'medication_reminder', 'follow_up_call')",
+            "kind IN ('discharge_voice_note', 'medication_reminder', 'follow_up_call', "
+            "'photo_request')",
             name="ck_delivery_runs_kind",
         ),
         CheckConstraint(

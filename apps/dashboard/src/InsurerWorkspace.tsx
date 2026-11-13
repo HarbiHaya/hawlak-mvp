@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ALERTS_CHANGED } from "./events";
 import { Icon } from "./Icon";
 import { AlertsView } from "./insurer/AlertsView";
+import { AnalyticsView } from "./insurer/AnalyticsView";
 import { CaseQueue, type QueueFilter } from "./insurer/CaseQueue";
 import { ContentTab, CoverageTab, DeliveryTab, MedicationsTab, PhotosTab, SourceTab } from "./insurer/tabs";
 import { coverageLabel, dialectLabel, languageLabel, t as texts, type CaseTab } from "./insurer/text";
@@ -15,6 +16,7 @@ import { Badge, Dialog, EmptyState, PageHeader, Tabs, useToast } from "./ui";
 export function InsurerWorkspace({ api, locale, section, reviewer, role, navigate }: { api: HawlakApi; locale: Locale; section: InsurerSection; reviewer: string; role: UserRole; navigate: (path: string) => void }) {
   const casesPath = viewPath(role, "insurer", "cases") ?? "/insurer/cases";
   if (section === "alerts") return <AlertsView api={api} locale={locale} onOpenCase={(caseId) => navigate(`${casesPath}?case=${encodeURIComponent(caseId)}`)} />;
+  if (section === "analytics") return <AnalyticsView api={api} locale={locale} casesPath={casesPath} alertsPath={viewPath(role, "insurer", "alerts") ?? "/insurer/alerts"} navigate={navigate} />;
   return <CasesView api={api} locale={locale} reviewer={reviewer} />;
 }
 

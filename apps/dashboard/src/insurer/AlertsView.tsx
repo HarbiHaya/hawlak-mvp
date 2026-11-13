@@ -5,7 +5,7 @@ import { ALERTS_CHANGED } from "../events";
 import { Icon } from "../Icon";
 import { displayError, formatDateTime, formatNumber, formatRelative, pick, type Locale } from "../i18n";
 import { Badge, EmptyState, PageHeader, Segmented, useToast } from "../ui";
-import { alertTypeLabel, answerKindLabel, t as texts } from "./text";
+import { alertTypeIcon, alertTypeLabel, answerKindLabel, t as texts } from "./text";
 
 type AlertFilter = "open" | "resolved";
 
@@ -57,11 +57,12 @@ export function AlertsView({ api, locale, onOpenCase }: { api: HawlakApi; locale
       {alerts === null && !error ? <div style={{ padding: 16, display: "grid", gap: 10 }} aria-hidden="true">{[0, 1].map((key) => <div key={key} className="skeleton" style={{ height: 44 }} />)}</div>
         : visible.length === 0 ? (filter === "open" ? <EmptyState icon="check-circle" title={t.noOpenAlerts}><p>{t.noAlertsHint}</p></EmptyState> : <EmptyState compact icon="bell" title={t.noResolved} />)
         : <ul className="rows">{visible.map((alert) => <li key={alert.id} className="row">
-          <span className={`row__icon row__icon--${alert.status === "open" ? "danger" : "success"}`}><Icon name={alert.type === "medication_access" ? "pill" : "phone"} size={15} /></span>
+          <span className={`row__icon row__icon--${alert.status !== "open" ? "success" : alert.severity === "high" ? "danger" : "neutral"}`}><Icon name={alertTypeIcon[alert.type] ?? "bell"} size={15} /></span>
           <div className="row__main">
             <b>{pick(alertTypeLabel, alert.type, locale)}{alertDetail(alert, locale) && <span style={{ fontWeight: 400 }}> — <bdi>{alertDetail(alert, locale)}</bdi></span>}</b>
             <small>{alert.patientName && <><bdi>{alert.patientName}</bdi> · </>}<time dateTime={alert.createdAt} title={formatDateTime(alert.createdAt, locale)}>{formatRelative(alert.createdAt, locale)}</time></small>
           </div>
+          {alert.status === "open" && <Badge tone={alert.severity === "high" ? "danger" : "neutral"} plain>{alert.severity === "high" ? t.priorityHigh : t.priorityLow}</Badge>}
           {alert.status === "resolved" && <Badge tone="success">{t.resolved}</Badge>}
           <button type="button" className="button button--sm button--ghost" onClick={() => onOpenCase(alert.caseId)}>{t.openCase}</button>
           {alert.status === "open" && <button type="button" className="button button--sm" disabled={resolving === alert.id} onClick={() => void resolve(alert.id)}><Icon name="check" size={14} />{t.resolve}</button>}

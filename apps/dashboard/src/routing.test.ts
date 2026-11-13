@@ -33,17 +33,28 @@ describe("role-scoped product routing", () => {
   it("builds navigation only for the signed-in role", () => {
     expect(navItems("hospital").map((item) => item.path)).toEqual([
       "/hospital/intake",
+      "/hospital/cases",
     ]);
     expect(navItems("insurer").map((item) => item.path)).toEqual([
       "/insurer/cases",
       "/insurer/alerts",
+      "/insurer/analytics",
     ]);
     expect(navItems("admin").map((item) => item.path)).toEqual([
       "/admin",
       "/admin/hospital",
+      "/admin/hospital/cases",
       "/admin/insurer/cases",
       "/admin/insurer/alerts",
+      "/admin/insurer/analytics",
       "/admin/caregiver",
     ]);
+  });
+
+  it("keeps analytics with the care team and submissions with the hospital", () => {
+    expect(resolveRoute("/insurer/analytics", "insurer").insurerSection).toBe("analytics");
+    expect(resolveRoute("/insurer/analytics", "hospital").path).toBe("/hospital/intake");
+    expect(resolveRoute("/hospital/cases", "hospital").hospitalSection).toBe("cases");
+    expect(resolveRoute("/hospital/cases", "caregiver").path).toBe("/caregiver/status");
   });
 });

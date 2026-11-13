@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent, type
 import { AdminHome } from "./AdminHome";
 import { HawlakLogo } from "./Brand";
 import { CaregiverWorkspace } from "./CaregiverWorkspace";
-import { HospitalWorkspace } from "./HospitalWorkspace";
+import { HospitalCases, HospitalWorkspace } from "./HospitalWorkspace";
 import { Icon } from "./Icon";
 import { InsurerWorkspace } from "./InsurerWorkspace";
 import { HawlakApi, type DemoSession } from "./api";
@@ -199,7 +199,7 @@ function ProductShell({ session, locale, onLocale, onLogout }: { session: DemoSe
     </aside>
     <main id="main" className="app-main" tabIndex={-1}>
       {route.view === "admin" && <AdminHome api={api} locale={locale} role={session.role} navigate={navigate} />}
-      {route.view === "hospital" && <HospitalWorkspace api={api} locale={locale} />}
+      {route.view === "hospital" && (route.hospitalSection === "cases" ? <HospitalCases api={api} locale={locale} /> : <HospitalWorkspace api={api} locale={locale} />)}
       {route.view === "insurer" && <InsurerWorkspace api={api} locale={locale} reviewer={session.username} role={session.role} section={route.insurerSection ?? "cases"} navigate={navigate} />}
       {route.view === "caregiver" && <CaregiverWorkspace api={api} locale={locale} />}
     </main>

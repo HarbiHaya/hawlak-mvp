@@ -43,6 +43,8 @@ export const t = {
     uploadImage: "رفع صورة", replaceImage: "استبدال الصورة", uploadingImage: "جارٍ الرفع…", approveImage: "اعتماد الصورة", imageApproved: "صورة معتمدة", imagePending: "صورة بانتظار الاعتماد", imageRejected: "صورة مرفوضة", noImage: "لا توجد صورة",
     addMedication: "إضافة دواء", removeMedication: "حذف الدواء", noMedications: "لا توجد أدوية.", removed: "حُذف «{name}».", undo: "تراجع", unnamed: "دواء بلا اسم",
     notDispensedHint: "يُنشأ تنبيه لفريق الرعاية عند الاعتماد.",
+    needsAttention: "تتطلب إجراءً", failedSteps: "{n} تعذّرت", registered: "وقت التسجيل", nextStep: "التالي:",
+    priorityHigh: "عالية الأولوية", priorityLow: "للمراجعة",
     unitStrength: "تركيز الحبة أو الكبسولة المؤكد", reminderTimes: "أوقات التذكير (بتوقيت السعودية)", timesHint: "مثال: 08:00، 20:00. بدونها يُرسل التذكير عند الاعتماد.",
     factDose: "الجرعة الموصوفة", factUnits: "عدد الحبات لكل جرعة", factTimes: "أوقات التذكير", factsAfterSave: "تُحدَّث بعد الحفظ.",
     patientPhoto: "الصورة من المريض بعد الاعتماد.", photoAfterApproval: "بعد الاعتماد يطلب حولك من المريض تصوير هذه العلبة باسمها المعتمد.",
@@ -91,6 +93,8 @@ export const t = {
     uploadImage: "Upload image", replaceImage: "Replace image", uploadingImage: "Uploading…", approveImage: "Approve image", imageApproved: "Image approved", imagePending: "Image awaiting approval", imageRejected: "Image rejected", noImage: "No image",
     addMedication: "Add medication", removeMedication: "Remove medication", noMedications: "No medications.", removed: "“{name}” removed.", undo: "Undo", unnamed: "Unnamed medication",
     notDispensedHint: "An alert is raised for the care team on approval.",
+    needsAttention: "Needs action", failedSteps: "{n} failed", registered: "Registered", nextStep: "Next:",
+    priorityHigh: "High priority", priorityLow: "For review",
     unitStrength: "Confirmed strength of one tablet or capsule", reminderTimes: "Reminder times (Saudi time)", timesHint: "Example: 08:00, 20:00. Without them the reminder goes at approval.",
     factDose: "Prescribed dose", factUnits: "Tablets or capsules per dose", factTimes: "Reminder times", factsAfterSave: "Updated after saving.",
     patientPhoto: "Photo sent by the patient after approval.", photoAfterApproval: "After approval, Hawlak asks the patient to photograph this box using its approved name.",
@@ -159,3 +163,4 @@ export const factReasonLabel: Record<string, Bilingual> = {
   unit_mismatch: { ar: "وحدة الجرعة تختلف عن وحدة التركيز", en: "dose and strength use different units" },
   not_whole_unit: { ar: "ليست حبة كاملة؛ يراجعها الصيدلي", en: "not a whole tablet; a pharmacist must check" },
 };
+export const alertTypeIcon: Record<string, string> = { medication_access: "pill", call_escalation: "phone", medicine_photo_mismatch: "image", medicine_photos_ready: "image" };

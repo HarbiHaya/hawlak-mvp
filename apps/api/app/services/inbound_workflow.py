@@ -19,10 +19,11 @@ from app.models import (
 from app.schemas.review_event import PharmacistReviewRequested
 from app.services.medicine_photos import MISMATCH, LabelReading, compare_reading, reply
 from app.services.object_storage import ObjectStorageError
-from app.services.whatsapp_client import WhatsAppApiError, WhatsAppMediaError
+from app.services.whatsapp_client import DownloadedMedia, WhatsAppApiError, WhatsAppMediaError
 
 logger = logging.getLogger(__name__)
 
+UPLOAD_PREFIX = "upload:"  # meta_media_id of a photo uploaded in the caregiver view
 SAFE_REPLY = "وصلت رسالتك، وبنخلي الفريق الصحي يراجعها. إذا عندك حالة طارئة اتصل على الإسعاف ٩٩٧."
 
 
@@ -44,6 +45,10 @@ class LabelReaderLike(Protocol):
 
 class InboundPersistenceError(RuntimeError):
     pass
+
+
+class PhotoUploadRejected(ValueError):
+    """A caregiver upload that is not needed or not allowed; the message is the error code."""
 
 
 class InboundWorkflow:
@@ -264,6 +269,70 @@ class InboundWorkflow:
         if count >= patient_case.expected_box_count:
             self._create_review_event(patient_case, "expected_photo_count_reached")
 
+    async def ingest_caregiver_upload(
+        self, *, case_id: str, medication_id: str, content: bytes, mime_type: str
+    ) -> str:
+        """A box photo the registered caregiver uploads in the caregiver view, for one approved
+        medicine that still has no usable photo (the patient sent none, or it was unclear).
+        Same label check as WhatsApp. Returns "received" or "unclear", never a verdict."""
+        patient_case = self.session.get(PatientCase, case_id)
+        journey = self.session.get(CareJourney, case_id)
+        if patient_case is None or journey is None:
+            raise LookupError(case_id)
+        if journey.review_status != "approved":
+            raise PhotoUploadRejected("journey_not_approved")
+        if not patient_case.caregiver_phone_e164:
+            raise PhotoUploadRejected("caregiver_not_registered")
+        medication = next(
+            (m for m in journey.medications if m["medicationId"] == medication_id), None
+        )
+        if medication is None or not medication["dispensed"]:
+            raise LookupError(medication_id)
+        if any(
+            p.medication_id == medication_id and p.check_status not in (None, "unreadable")
+            for p in self._case_photos(case_id)
+        ):
+            raise PhotoUploadRejected("photo_already_received")
+
+        upload_id = new_id()
+        stored = self.storage.store_case_media(
+            case_id=case_id,
+            content=content,
+            content_type=mime_type,
+            source_media_id=f"upload-{upload_id}",
+        )
+        # No WhatsApp message exists for an upload; the log row records where the photo came from.
+        message = MessageLog(
+            case_id=case_id,
+            direction="inbound",
+            message_type="image",
+            processing_status="processed",
+            normalized_payload={
+                "source": "caregiver_upload",
+                "medicationId": medication_id,
+                "senderRole": "caregiver",
+            },
+        )
+        self.session.add(message)
+        self.session.flush()
+        media = InboundMedia(
+            case_id=case_id,
+            message_log_id=message.id,
+            meta_media_id=f"{UPLOAD_PREFIX}{upload_id}",
+            mime_type=mime_type,
+            object_key=stored.key,
+            object_sha256=stored.sha256,
+            processing_status="stored",
+            sender_role="caregiver",
+        )
+        self.session.add(media)
+        patient_case.status = "photo_collection"
+        self.session.commit()
+        await self._check_photo(
+            media, patient_case, journey, DownloadedMedia(content, mime_type), requested=medication
+        )
+        return "unclear" if media.check_status == "unreadable" else "received"
+
     def _create_review_event(
         self,
         patient_case: PatientCase,
@@ -332,14 +401,19 @@ class InboundWorkflow:
         self.session.commit()
         return event
 
-    async def _check_photo(self, media, patient_case, journey, downloaded) -> None:
+    async def _check_photo(
+        self, media, patient_case, journey, downloaded, requested: dict | None = None
+    ) -> None:
         """Link the photo to the medicine Hawlak asked for (or, when the box was sent out of
         order, to the one other waiting medicine its label matches), alert a person on a
         mismatch, then ask for the next box with a fixed reply."""
         dispensed = [m for m in journey.medications if m["dispensed"]]
         earlier = [p for p in self._case_photos(patient_case.id) if p.id != media.id]
         accepted = {p.medication_id for p in earlier if p.check_status not in (None, "unreadable")}
-        expected = next((m for m in dispensed if m["medicationId"] not in accepted), None)
+        # A caregiver upload names its medicine; a WhatsApp photo takes the first waiting one.
+        expected = requested or next(
+            (m for m in dispensed if m["medicationId"] not in accepted), None
+        )
         language = journey.language_code
         if expected is None:
             # Every requested box already arrived: keep the photo for a person, skip the read.
@@ -350,7 +424,7 @@ class InboundWorkflow:
 
         reading = await self._read_once(earlier, media, downloaded)
         status = compare_reading(reading, expected)
-        if status == "different_medicine":
+        if status == "different_medicine" and requested is None:
             # Sent out of order: code (not the model) finds the one other approved medicine
             # still waiting that this label matches. None or several: keep the requested slot.
             waiting = [
@@ -425,6 +499,8 @@ class InboundWorkflow:
         )
 
     async def _reply(self, patient_case, media, text: str) -> None:
+        if media.meta_media_id.startswith(UPLOAD_PREFIX):
+            return  # an upload is answered in the caregiver view, not on WhatsApp
         recipient = (
             patient_case.caregiver_phone_e164
             if media.sender_role == "caregiver" and patient_case.caregiver_phone_e164

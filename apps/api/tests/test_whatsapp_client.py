@@ -174,6 +174,29 @@ async def test_upload_image_and_send_two_choice_reminder_without_a_link():
     assert "url" not in json.dumps(payload).lower()
 
 
+async def test_dose_question_without_a_photo_has_no_header_and_follows_the_language():
+    seen: list[httpx.Request] = []
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        seen.append(request)
+        return httpx.Response(200, json={"messages": [{"id": "wamid.q"}]}, request=request)
+
+    whatsapp = media_client(handler)
+    assert await whatsapp.send_photo_reminder(RECIPIENT, language="en") == "wamid.q"
+    assert await whatsapp.send_photo_reminder(RECIPIENT) == "wamid.q"
+
+    english, arabic = (json.loads(request.content)["interactive"] for request in seen)
+    assert "header" not in english and "header" not in arabic
+    assert english["body"]["text"] == (
+        "Press 1 if you took the dose, or 2 if you have not taken it yet."
+    )
+    assert arabic["body"]["text"] == "اضغط 1 إذا أخذت الجرعة، أو 2 إذا لم تأخذها بعد."
+    assert [b["reply"] for b in english["action"]["buttons"]] == [
+        {"id": "taken", "title": "1"},
+        {"id": "not_yet", "title": "2"},
+    ]
+
+
 async def test_download_image_fetches_metadata_then_bounded_https_bytes():
     seen: list[httpx.Request] = []
 

@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 import type { WorkspaceCaseSummary } from "../api";
 import { Icon } from "../Icon";
-import { formatNumber, type Locale } from "../i18n";
+import { formatNumber, formatRelative, formatShort, type Locale } from "../i18n";
 import { Badge, Segmented } from "../ui";
 import { t as texts } from "./text";
 
@@ -40,9 +40,13 @@ export function CaseQueue({ cases, locale, filter, onFilter, query, onQuery, sel
           <b>{item.patientName}</b>
           <span className="queue-item__meta">
             {item.alertCount > 0 && <span className="count count--danger" title={t.openAlerts.replace("{n}", String(item.alertCount))} aria-label={t.openAlerts.replace("{n}", String(item.alertCount))}>{formatNumber(item.alertCount, locale)}</span>}
+            {item.stage === "needs_attention" && <Badge tone="danger" plain>{t.needsAttention}</Badge>}
+            {!!item.failedRunCount && <Badge tone="warning" plain>{t.failedSteps.replace("{n}", formatNumber(item.failedRunCount, locale))}</Badge>}
             {filter === "all" && <Badge tone={item.reviewStatus === "approved" ? "success" : "warning"} plain>{item.reviewStatus === "approved" ? t.statusApproved : t.statusDraft}</Badge>}
           </span>
           <small className="mono" dir="ltr" style={{ justifySelf: "start" }}>{item.caseId}</small>
+          {item.reviewStatus === "draft" && item.createdAt ? <small className="queue-item__when" title={t.registered}>{formatRelative(item.createdAt, locale)}</small>
+            : item.nextStepAt ? <small className="queue-item__when">{t.nextStep} <bdi>{formatShort(item.nextStepAt, locale)}</bdi></small> : null}
         </button>
       </li>)}</ul>}
   </aside>;

@@ -1,9 +1,9 @@
-import { useRef, useState, type DragEvent, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEvent } from "react";
 
 import { Icon } from "./Icon";
-import { type DialectCode, type HawlakApi } from "./api";
-import { displayError, type Locale } from "./i18n";
-import { CopyButton, Field, Notice, PageHeader, Segmented } from "./ui";
+import { type DialectCode, type HawlakApi, type HospitalCase } from "./api";
+import { displayError, formatDateTime, formatNumber, formatRelative, type Locale } from "./i18n";
+import { Badge, CopyButton, EmptyState, Field, Notice, PageHeader, Segmented } from "./ui";
 
 const labels = {
   ar: {
@@ -159,5 +159,49 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
         <button className="button button--primary button--lg" disabled={busy}>{busy ? t.sending : t.submit}</button>
       </footer>
     </form>
+  </div>;
+}
+
+const caseLabels = {
+  ar: {
+    title: "الحالات المرسلة", subtitle: "كل حالة سجّلها المستشفى وموقفها لدى شركة التأمين.", refresh: "تحديث",
+    review: "قيد مراجعة شركة التأمين", approved: "اعتُمدت خطة المتابعة", submitted: "أُرسلت", approvedOn: "اعتُمدت",
+    empty: "لم تُسجَّل حالات بعد", emptyHint: "تظهر هنا الحالات بعد إرسالها من صفحة تسجيل حالة.", count: "{n} حالة", waiting: "{n} قيد المراجعة",
+  },
+  en: {
+    title: "Submitted cases", subtitle: "Every case the hospital registered and where it stands with the insurer.", refresh: "Refresh",
+    review: "Under insurer review", approved: "Follow-up plan approved", submitted: "Submitted", approvedOn: "Approved",
+    empty: "No cases registered yet", emptyHint: "Cases appear here after they are submitted from Register case.", count: "{n} cases", waiting: "{n} under review",
+  },
+} as const;
+
+/** What the hospital sent and whether the insurer has approved it. No clinical content. */
+export function HospitalCases({ api, locale }: { api: HawlakApi; locale: Locale }) {
+  const t = caseLabels[locale];
+  const [cases, setCases] = useState<HospitalCase[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const load = useCallback(async () => {
+    try { setCases((await api.listHospitalCases()).data); setError(null); }
+    catch (caught) { setError(displayError(caught, locale)); }
+  }, [api, locale]);
+  useEffect(() => { void load(); }, [load]);
+  const waiting = cases?.filter((item) => item.reviewStatus === "draft").length ?? 0;
+
+  return <div className="page">
+    <PageHeader title={t.title} description={t.subtitle} actions={<button type="button" className="button" onClick={() => void load()}><Icon name="refresh" size={15} />{t.refresh}</button>} />
+    {error && <div style={{ marginBottom: 16 }}><Notice tone="danger">{error}</Notice></div>}
+    <section className="panel">
+      {cases && cases.length > 0 && <header className="panel__header"><h2>{t.count.replace("{n}", formatNumber(cases.length, locale))}</h2>{waiting > 0 && <Badge tone="warning">{t.waiting.replace("{n}", formatNumber(waiting, locale))}</Badge>}</header>}
+      {cases === null && !error ? <div style={{ padding: 16, display: "grid", gap: 10 }} aria-hidden="true">{[0, 1, 2].map((key) => <div key={key} className="skeleton" style={{ height: 44 }} />)}</div>
+        : !cases || cases.length === 0 ? <EmptyState icon="file-plus-2" title={t.empty}><p>{t.emptyHint}</p></EmptyState>
+        : <ul className="rows">{cases.map((item) => <li key={item.caseId} className="row">
+          <div className="row__main">
+            <b>{item.patientName}</b>
+            <small><span className="mono" dir="ltr">{item.caseId}</span> · {t.submitted} <time dateTime={item.submittedAt} title={formatDateTime(item.submittedAt, locale)}>{formatRelative(item.submittedAt, locale)}</time>{item.approvedAt && <> · {t.approvedOn} <bdi>{formatDateTime(item.approvedAt, locale)}</bdi></>}</small>
+          </div>
+          <Badge tone={item.reviewStatus === "approved" ? "success" : "warning"}>{item.reviewStatus === "approved" ? t.approved : t.review}</Badge>
+          <CopyButton value={item.caseId} locale={locale} />
+        </li>)}</ul>}
+    </section>
   </div>;
 }

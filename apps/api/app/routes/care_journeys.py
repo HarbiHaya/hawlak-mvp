@@ -1,7 +1,7 @@
 from pathlib import PurePosixPath
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Header, Request, Response
+from fastapi import APIRouter, Depends, Header, Query, Request, Response
 from fastapi.responses import JSONResponse
 
 from app.config import SettingsDep
@@ -16,6 +16,7 @@ from app.schemas.care_journey import (
     EligibilityRequest,
     PhotoReviewRequest,
 )
+from app.services.analytics import programme_analytics
 from app.services.care_journey_service import (
     DEFAULT_CALL_PLAN,
     CareJourneyService,
@@ -24,8 +25,11 @@ from app.services.care_journey_service import (
     drafted_content,
 )
 from app.services.discharge_parser import draft_medications, parse_discharge_pdf
+from app.services.inbound_workflow import InboundWorkflow, PhotoUploadRejected
 from app.services.journey_drafter import build_journey_drafter
+from app.services.medicine_photos import build_label_reader
 from app.services.object_storage import ObjectStorageError, StorageDep
+from app.services.whatsapp_client import ALLOWED_IMAGE_MIME_TYPES, MAX_IMAGE_BYTES
 
 router = APIRouter()
 MAX_DOCUMENT_BYTES = 5 * 1024 * 1024
@@ -114,6 +118,19 @@ def create_workspace_case(
 @router.get("/workspace/cases")
 def list_workspace_cases(session: SessionDep):
     return {"data": CareJourneyService(session).list_cases()}
+
+
+@router.get("/workspace/analytics")
+def workspace_analytics(
+    session: SessionDep, settings: SettingsDep, days: Annotated[int, Query(ge=1, le=365)] = 30
+):
+    """Programme counts and times for the care team; never a patient detail."""
+    return {**programme_analytics(session, days), "deliveryMode": settings.demo_provider_mode}
+
+
+@router.get("/hospital/cases")
+def hospital_cases(session: SessionDep):
+    return {"data": CareJourneyService(session).hospital_cases()}
 
 
 @router.get("/workspace/cases/{case_id}")
@@ -259,6 +276,46 @@ def caregiver_case(case_id: str, session: SessionDep):
         return CareJourneyService(session).caregiver(case_id)
     except JourneyNotFound as exc:
         return error_response(exc)
+
+
+@router.post("/caregiver/cases/{case_id}/medications/{medication_id}/photo", status_code=201)
+async def upload_caregiver_photo(
+    case_id: str,
+    medication_id: str,
+    request: Request,
+    session: SessionDep,
+    storage: StorageDep,
+    settings: SettingsDep,
+):
+    """The registered caregiver uploads a box photo the patient did not send, or sent unclear.
+    The reply says only received or unclear; a mismatch goes to the reviewer as an alert."""
+    mime_type = request.headers.get("content-type", "").split(";", 1)[0].strip().lower()
+    content = await request.body()
+    if mime_type not in ALLOWED_IMAGE_MIME_TYPES or not _looks_like_image(content):
+        return JSONResponse(status_code=415, content={"error": "image_required"})
+    if len(content) > MAX_IMAGE_BYTES:
+        return JSONResponse(status_code=413, content={"error": "image_size_invalid"})
+    workflow = InboundWorkflow(session, storage, None, build_label_reader(settings))
+    try:
+        result = await workflow.ingest_caregiver_upload(
+            case_id=case_id, medication_id=medication_id, content=content, mime_type=mime_type
+        )
+    except LookupError:
+        return JSONResponse(status_code=404, content={"error": "medication_not_found"})
+    except PhotoUploadRejected as exc:
+        return JSONResponse(status_code=409, content={"error": str(exc)})
+    except ObjectStorageError:
+        return JSONResponse(status_code=503, content={"error": "storage_unavailable"})
+    return {"result": result}
+
+
+def _looks_like_image(content: bytes) -> bool:
+    """The declared type is the browser's word; check the file's own first bytes too."""
+    return (
+        content.startswith((b"\xff\xd8\xff", b"\x89PNG\r\n\x1a\n"))
+        or (content[:4] == b"RIFF" and content[8:12] == b"WEBP")
+        or content[4:8] == b"ftyp"  # HEIC and HEIF
+    )
 
 
 @router.get("/call-plans/{plan_or_case_id}")

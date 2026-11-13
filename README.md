@@ -78,6 +78,8 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
     against that one medicine. Identical photos are read once.
   - Fixed replies only. A mismatch alerts the reviewer, who confirms or marks
     follow-up. Reminders then carry the patient's matched or confirmed box photo.
+  - After every reminder voice note, Hawlak asks the patient to press 1 if the dose was
+    taken or 2 if not yet, in the journey's language, with or without a photo.
 - Sourced dose details (`apps/api/app/services/dose_facts.py`):
   - Each detail carries its source: `prescribed` (in the discharge instructions),
     `calculated` (by code), `reminder_preference` (a chosen time) or `unknown`.
@@ -89,7 +91,21 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
   - The model only phrases these fields in the patient's dialect; it never calculates.
 - WhatsApp template for the photo request: the code sends it when
   `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names an approved template; otherwise plain text.
-- Checks: API 247 tests, dashboard 19 tests, contracts 3 tests, typecheck and build.
+- Caregiver photo upload: in the caregiver view, the registered caregiver can upload a
+  box photo for any approved medicine that has no usable photo (the patient sent none,
+  or it was unclear). It goes through the same label check and gets the same fixed
+  replies as a WhatsApp photo.
+- Care-team worklist: cases are ordered by what needs a person first (open high alert,
+  then the review waiting longest, then active, then completed), with the registration
+  time, the next scheduled step and failed steps on each row. Alerts show a priority
+  and are ordered open, high, oldest first.
+- Programme analytics for the insurer (`/insurer/analytics`,
+  `apps/api/app/services/analytics.py`): what is waiting now, the journey funnel,
+  review times, delivery by step, call outcomes, box photos and alerts by type, for
+  the last 7, 30 or 90 days. Counts, rates and times only; no name, phone number or
+  case reference.
+- Hospital "Submitted cases" list: each registered case with its review status.
+- Checks: API 258 tests, agent 36 tests, dashboard 28 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 
@@ -105,7 +121,14 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
 - Reconcile Retaj's pharmacist-review dashboard (on `main` from PR #1) with this
   branch.
 - Contract review by Haya and Retaj of the new fields: `memberId`, `callPlan`
-  schedule, `insurance`, `generatedDraft`, `caregiverPhoneE164`, `medicinePhotos` and the `photo_request` run.
+  schedule, `insurance`, `generatedDraft`, `caregiverPhoneE164`, `medicinePhotos` and the `photo_request` run;
+  the case-list fields `stage`, `highAlertCount`, `failedRunCount`, `createdAt`,
+  `approvedAt` and `nextStepAt`; `resolvedAt` on alerts; `canUploadPhoto` in the
+  caregiver view; and the new endpoints `GET /internal/workspace/analytics`,
+  `GET /internal/hospital/cases` and
+  `POST /internal/caregiver/cases/{case}/medications/{med}/photo`.
+- Analytics does not measure yet: reminder replies (`taken`/`not_yet`) by medicine,
+  readmissions, and cost. Add them when the data exists.
 - OCR for scanned PDFs, and a real insurer integration in place of the mock.
 - Before any real data:
   - HTTPS from CloudFront to the origin.

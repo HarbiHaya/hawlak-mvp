@@ -65,6 +65,65 @@ export interface WorkspaceCaseSummary {
   languageCode: "ar" | "en";
   reviewStatus: WorkspaceReviewStatus;
   alertCount: number;
+  /** Where the case stands for the care team; the list arrives sorted by it. */
+  stage?: CaseStage;
+  highAlertCount?: number;
+  failedRunCount?: number;
+  createdAt?: string;
+  approvedAt?: string | null;
+  nextStepAt?: string | null;
+}
+
+export type CaseStage = "needs_attention" | "needs_review" | "active" | "completed";
+
+export interface HospitalCase {
+  caseId: string;
+  patientName: string;
+  submittedAt: string;
+  reviewStatus: WorkspaceReviewStatus;
+  approvedAt: string | null;
+}
+
+/** Programme counts and times for the chosen period. It never carries a patient detail. */
+export interface ProgrammeAnalytics {
+  periodDays: number;
+  generatedAt: string;
+  deliveryMode: "mock" | "live";
+  now: {
+    awaitingReview: number;
+    oldestWaitingHours: number | null;
+    needsAttention: number;
+    activeJourneys: number;
+    completedJourneys: number;
+    openAlerts: { high: number; low: number };
+    oldestOpenAlertHours: number | null;
+    photosAwaitingReview: number;
+  };
+  funnel: Array<{ stage: string; count: number }>;
+  review: {
+    medianHoursToApproval: number | null;
+    approvedWithin24hPct: number | null;
+    draftEditedPct: number | null;
+    aiDraftPct: number | null;
+    aiDraftRejected: number;
+  };
+  delivery: Array<{ kind: string; scheduled: number; delivered: number; failed: number; simulated: number; successPct: number | null }>;
+  calls: { scheduled: number; awaitingOutcome: number; completed: number; transferred: number; failed: number; escalationPct: number | null };
+  photos: {
+    total: number;
+    byStatus: Record<string, number>;
+    bySender: Record<string, number>;
+    boxesExpected: number;
+    boxesWithPhoto: number;
+    firstReadMatchPct: number | null;
+    awaitingReview: number;
+    medianHoursToReview: number | null;
+  };
+  alerts: Array<{ type: string; severity: string | null; open: number; resolved: number; medianHoursToResolve: number | null }>;
+  medications: { total: number; notDispensed: number; remindersEnabled: number; withReminderTimes: number; withConfirmedStrength: number };
+  languages: Record<string, number>;
+  dialects: Record<string, number>;
+  daily: Array<{ date: string; registered: number; approved: number }>;
 }
 
 export interface DischargeVoiceNote {
@@ -209,6 +268,7 @@ export interface WorkspaceAlert {
   status: "open" | "resolved";
   summary: string;
   createdAt: string;
+  resolvedAt?: string | null;
 }
 
 export interface DischargeExtraction {
@@ -230,6 +290,8 @@ export interface CaregiverCase {
     displayName: string;
     status: "scheduled" | "needs_support";
     photoStatus?: "missing" | "received" | "needs_attention" | "confirmed";
+    /** True when a registered caregiver may upload this box's photo: none arrived, or it was unclear. */
+    canUploadPhoto?: boolean;
   }>;
   openAlertCount: number;
   nextCallAt: string | null;
@@ -460,8 +522,28 @@ export class HawlakApi {
     });
   }
 
+  getAnalytics(days: number): Promise<ProgrammeAnalytics> {
+    return this.request(`/internal/workspace/analytics?days=${days}`);
+  }
+
+  listHospitalCases(): Promise<{ data: HospitalCase[] }> {
+    return this.request("/internal/hospital/cases");
+  }
+
   getCaregiverCase(caseId: string): Promise<CaregiverCase> {
     return this.request(`/internal/caregiver/cases/${encodeURIComponent(caseId)}`);
+  }
+
+  /** The reply is only "received" or "unclear"; the label check result goes to the reviewer. */
+  uploadCaregiverPhoto(
+    caseId: string,
+    medicationId: string,
+    photo: File,
+  ): Promise<{ result: "received" | "unclear" }> {
+    return this.request(
+      `/internal/caregiver/cases/${encodeURIComponent(caseId)}/medications/${encodeURIComponent(medicationId)}/photo`,
+      { method: "POST", headers: { "Content-Type": photo.type }, body: photo },
+    );
   }
 
   approveAudioFirst(

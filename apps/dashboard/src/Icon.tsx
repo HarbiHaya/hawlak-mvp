@@ -34,6 +34,8 @@ const paths: Record<string, ReactNode> = {
   trash: <><path d="M3 6h18M8 6V4h8v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6" /></>,
   sparkle: <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5 18 18M6 18l2.5-2.5M15.5 8.5 18 6" />,
   dot: <circle cx="12" cy="12" r="4" />,
+  chart: <path d="M4 20V10M10 20V4M16 20v-7M22 20H2" />,
+  list: <path d="M8 6h13M8 12h13M8 18h13M3.5 6h.01M3.5 12h.01M3.5 18h.01" />,
 };
 
 export function Icon({ name, size = 18, label }: { name: string; size?: number; label?: string }) {

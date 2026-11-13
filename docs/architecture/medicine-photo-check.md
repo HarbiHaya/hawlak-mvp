@@ -11,6 +11,10 @@ then only asks: does this box match that one medicine?
 
 - Only the patient's side takes photos: the patient, or a caregiver registered at
   intake. The insurer dashboard has no image upload.
+- The registered caregiver can also upload a box photo in the caregiver view, for
+  a medicine that has no usable photo (the patient sent none, or it was unclear).
+  The caregiver picks the medicine, so the slot is the one they chose. The photo
+  gets the same label check and the same fixed result: received or unclear.
 - The link from photo to medicine is deterministic. It comes from the request
   order, never from the model.
 - A box sent out of order is the one exception. When the label fails the
@@ -73,7 +77,8 @@ sequenceDiagram
 | Alerts | `medicine_photo_mismatch` (high), `medicine_photos_ready` (low) | Confirming a photo resolves its mismatch alert |
 | Reviewer | Insurer **Medicine photos** tab, `POST /workspace/cases/{id}/photos/{photoId}/review` | Decision: `confirmed` or `follow_up` |
 | Caregiver view | `photoStatus` per medicine | missing, received, needs_attention, confirmed |
-| Reminder image | `journey_delivery._patient_photo_key` | Latest matched (not marked follow-up) or confirmed patient photo. Without one, the voice reminder goes alone |
+| Caregiver upload | `InboundWorkflow.ingest_caregiver_upload`, `POST /internal/caregiver/cases/{case}/medications/{med}/photo`, `canUploadPhoto` per medicine | Approved journey with a registered caregiver phone only. JPEG, PNG, WebP or HEIC. Refused when that medicine already has a readable photo. Stored with `sender_role` caregiver |
+| Reminder image | `journey_delivery._patient_photo_key` | Latest matched (not marked follow-up) or confirmed patient photo. After each reminder voice note Hawlak asks "press 1 if you took the dose, 2 if not yet"; the photo sits on that question, and without one the question goes with no photo |
 | Data | `inbound_media`: `sender_role`, `label_reading`, `check_status`, `medication_id`, review fields | Migrations 0004 and 0005 |
 
 ## Cost
@@ -111,14 +116,15 @@ OCR finds no approved name. That adds a dependency and is only worth it at volum
 - [x] Mismatch and all-received alerts
 - [x] Reviewer tab with confirm or follow-up
 - [x] Caregiver photo status
-- [x] Reminders use the matched or confirmed patient photo, or go voice-only
+- [x] Reminders use the matched or confirmed patient photo; every reminder asks taken (1) or not yet (2), with or without a photo
 - [x] Out-of-order photos link to their own waiting medicine instead of raising an alert
-- [x] Tests: API 247, dashboard 19; live reader checked with synthetic boxes
+- [x] Caregiver upload in the caregiver view for a missing or unclear photo
+- [x] Tests: API 258, dashboard 28; live reader checked with synthetic boxes
 - [x] Photo request sent as a WhatsApp template when `WHATSAPP_PHOTO_REQUEST_TEMPLATE` is set
 - [ ] Create that template in Meta and get it approved (see below)
 - [ ] Recorded caregiver consent and revocation
 - [ ] Arabic-only plan names: add a Latin name or code so they can match a box
-- [ ] Contract review of `caregiverPhoneE164`, `medicinePhotos` and `photo_request` by Haya and Retaj
+- [ ] Contract review of `caregiverPhoneE164`, `medicinePhotos`, `photo_request`, `canUploadPhoto` and the caregiver upload endpoint by Haya and Retaj
 - [ ] Optional OCR-first path if volume makes model reads matter
 
 ## WhatsApp template

@@ -111,15 +111,20 @@ def test_hospital_intake_is_replay_safe_and_visible_to_insurer(
 
     listing = client.get("/internal/workspace/cases", headers=internal_auth_headers)
     assert listing.status_code == 200
-    assert listing.json()["data"] == [
-        {
-            "caseId": "case_poc_01",
-            "patientName": "مريم خالد العتيبي",
-            "languageCode": "ar",
-            "reviewStatus": "draft",
-            "alertCount": 0,
-        }
-    ]
+    (row,) = listing.json()["data"]
+    assert row.pop("createdAt")
+    assert row == {
+        "caseId": "case_poc_01",
+        "patientName": "مريم خالد العتيبي",
+        "languageCode": "ar",
+        "reviewStatus": "draft",
+        "alertCount": 0,
+        "stage": "needs_review",
+        "highAlertCount": 0,
+        "failedRunCount": 0,
+        "approvedAt": None,
+        "nextStepAt": None,
+    }
 
 
 def test_insurer_can_edit_then_approve_exact_content_and_create_delivery_runs(
@@ -281,6 +286,7 @@ def test_caregiver_projection_excludes_phone_scripts_and_document(client, intern
             "displayName": "دواء تجريبي ألف",
             "status": "scheduled",
             "photoStatus": "missing",
+            "canUploadPhoto": False,
         }
     ]
     serialized = str(payload)

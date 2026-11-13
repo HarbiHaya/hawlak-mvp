@@ -41,7 +41,8 @@ when you finish a milestone.
 | Dose details with their source, tablet count, reminder times | `apps/api/app/services/dose_facts.py` |
 | Patient-text identifier gate | `apps/api/app/services/patient_identifiers.py` |
 | Medicine-photo label check and fixed replies | `apps/api/app/services/medicine_photos.py` |
-| Inbound WhatsApp (patient or caregiver) | `apps/api/app/services/inbound_workflow.py` |
+| Inbound WhatsApp (patient or caregiver) and caregiver photo upload | `apps/api/app/services/inbound_workflow.py` |
+| Programme analytics and worklist stage (aggregates only) | `apps/api/app/services/analytics.py` |
 | Mock insurer eligibility and enrollment | `apps/api/app/services/insurer_systems.py` |
 | Meta and call dispatch | `apps/api/app/services/journey_delivery.py` |
 | Role APIs | `apps/api/app/routes/care_journeys.py` |
@@ -63,7 +64,8 @@ pull request reviewed by both Haya and Retaj.
   until its exact script is approved.
 - Never log tokens or full phone numbers (last 4 digits only).
 - Medicine photos come only from the patient or the registered caregiver, never
-  the insurer. Hawlak asks for each approved medicine by name, and each photo is
+  the insurer. They arrive on WhatsApp, or the caregiver uploads one in the
+  caregiver view for a medicine that still has no usable photo. Hawlak asks for each approved medicine by name, and each photo is
   linked to the medicine it was requested for (its slot), never by model guess.
   The vision model reads only the printed label; code compares it with that one
   medicine. The one exception is a box sent out of order: when the label fails
@@ -71,6 +73,8 @@ pull request reviewed by both Haya and Retaj.
   medicine still waiting for its photo, the photo is linked there instead. Senders get only the fixed replies in `PHOTO_REPLIES`, never a
   verdict; a mismatch becomes an alert for a person. Design:
   [`docs/architecture/medicine-photo-check.md`](docs/architecture/medicine-photo-check.md).
+- Analytics returns counts, rates and times only: never a name, a phone number
+  or a case reference.
 - `apps/api` holds no UI code. `apps/dashboard` holds no AI, WhatsApp, database
   or storage code; it only calls the API.
 - Generated drafts must pass `guard_draft`, which checks numbers, medicine names

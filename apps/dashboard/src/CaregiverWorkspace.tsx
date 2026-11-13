@@ -14,7 +14,8 @@ const labels = {
     scheduled: "التذكير مفعّل", needs_support: "يتطلب دعماً", reviewNotice: "خطة المتابعة قيد المراجعة لدى شركة التأمين. تظهر مواعيد التذكيرات والمكالمات بعد اعتمادها.",
     alertNotice: "يتابع فريق الرعاية {n} تنبيه مفتوح لهذه الحالة.", empty: "أدخل رقم الحالة", emptyHint: "تظهر هنا حالة الأدوية والمكالمة القادمة والتنبيهات.",
     noMeds: "لا توجد أدوية في الخطة.", updated: "آخر تحديث {time}", refresh: "تحديث", change: "حالة أخرى",
-    photosHint: "أرسل صورة لكل علبة دواء من رقمك المسجّل على واتساب حولك. يراجعها الصيدلي.",
+    photosHint: "أرسل صورة لكل علبة دواء من رقمك المسجّل على واتساب حولك، أو ارفعها من هنا إذا لم تصل صورة المريض أو كانت غير واضحة. يراجعها الصيدلي.",
+    upload: "رفع صورة العلبة", uploading: "جارٍ الرفع…", uploaded: "وصلت الصورة، شكراً. يراجعها الصيدلي.", unclear: "الصورة غير واضحة. صوّر الاسم المكتوب على العلبة مرة ثانية.",
     photo_missing: "لم تصل صورة", photo_received: "وصلت الصورة", photo_needs_attention: "يراجعها الصيدلي", photo_confirmed: "أكّدها الصيدلي",
   },
   en: {
@@ -24,7 +25,8 @@ const labels = {
     scheduled: "Reminder active", needs_support: "Support required", reviewNotice: "The follow-up plan is under review by the insurer. Reminder and call times appear once it is approved.",
     alertNotice: "The care team is following up on {n} open alerts for this case.", empty: "Enter a case reference", emptyHint: "Medication status, the next call and alerts appear here.",
     noMeds: "No medications in the plan.", updated: "Updated {time}", refresh: "Refresh", change: "Another case",
-    photosHint: "Send a photo of each medicine box from your registered number to Hawlak on WhatsApp. A pharmacist reviews them.",
+    photosHint: "Send a photo of each medicine box from your registered number to Hawlak on WhatsApp, or upload it here if the patient's photo did not arrive or was unclear. A pharmacist reviews them.",
+    upload: "Upload box photo", uploading: "Uploading…", uploaded: "Photo received, thank you. A pharmacist will review it.", unclear: "The photo is not clear. Photograph the name printed on the box again.",
     photo_missing: "No photo yet", photo_received: "Photo received", photo_needs_attention: "Pharmacist reviewing", photo_confirmed: "Confirmed by pharmacist",
   },
 } as const;
@@ -45,6 +47,8 @@ export function CaregiverWorkspace({ api, locale }: { api: HawlakApi; locale: Lo
   const [error, setError] = useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
   const activeId = useRef<string | null>(null);
+  const [uploading, setUploading] = useState<string | null>(null);
+  const [photoNotice, setPhotoNotice] = useState<"uploaded" | "unclear" | null>(null);
 
   const load = useCallback(async (id: string, quiet = false) => {
     const reference = id.trim();
@@ -70,6 +74,18 @@ export function CaregiverWorkspace({ api, locale }: { api: HawlakApi; locale: Lo
     const timer = window.setInterval(() => { if (activeId.current) void load(activeId.current, true); }, 30_000);
     return () => window.clearInterval(timer);
   }, [data, load]);
+
+  // The registered caregiver sends a box photo the patient did not send, or sent unclear.
+  async function upload(medicationId: string, photo: File | undefined) {
+    if (!photo || !data) return;
+    setUploading(medicationId); setError(null); setPhotoNotice(null);
+    try {
+      const { result } = await api.uploadCaregiverPhoto(data.caseId, medicationId, photo);
+      setPhotoNotice(result === "unclear" ? "unclear" : "uploaded");
+      await load(data.caseId, true);
+    } catch (caught) { setError(displayError(caught, locale)); }
+    finally { setUploading(null); }
+  }
 
   function submit(event: FormEvent) {
     event.preventDefault();
@@ -102,8 +118,10 @@ export function CaregiverWorkspace({ api, locale }: { api: HawlakApi; locale: Lo
           : <ul className="rows">{data.medications.map((item) => <li key={item.medicationId} className="row">
             <span className="row__icon"><Icon name="pill" size={15} /></span>
             <div className="row__main"><b>{item.displayName}</b>{item.photoStatus && <small className={`photo-state photo-state--${item.photoStatus}`}>{t[`photo_${item.photoStatus}`]}</small>}</div>
+            {item.canUploadPhoto && <label className="button button--sm file-button" aria-disabled={uploading !== null}><Icon name="upload" size={14} />{uploading === item.medicationId ? t.uploading : t.upload}<input className="sr-only" type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" disabled={uploading !== null} onChange={(event) => { void upload(item.medicationId, event.target.files?.[0]); event.target.value = ""; }} /></label>}
             {approved && <Badge tone={item.status === "scheduled" ? "success" : "warning"}>{t[item.status]}</Badge>}
           </li>)}</ul>}
+        {photoNotice && <div style={{ padding: "0 16px 12px" }}><Notice tone={photoNotice === "unclear" ? "warning" : "success"}>{t[photoNotice]}</Notice></div>}
         {approved && data.medications.length > 0 && <p className="photo-hint">{t.photosHint}</p>}
       </section>
     </div>}

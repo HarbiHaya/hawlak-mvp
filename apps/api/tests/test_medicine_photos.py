@@ -10,7 +10,7 @@ import pytest
 from app.models import Alert, DeliveryRun, InboundMedia
 from app.schemas.care_journey import CareJourneyCreate
 from app.services.care_journey_service import CareJourneyService
-from app.services.inbound_workflow import InboundWorkflow
+from app.services.inbound_workflow import InboundWorkflow, PhotoUploadRejected
 from app.services.journey_delivery import (
     JourneyDeliveryOrchestrator,
     JourneyDeliveryPayload,
@@ -361,6 +361,137 @@ def test_the_insurer_can_no_longer_upload_medicine_images(client, internal_auth_
     assert response.status_code in {404, 405}
 
 
+JPEG = b"\xff\xd8\xff synthetic box photo"
+
+
+def upload_workflow(db_session, reader=None, whatsapp=None) -> InboundWorkflow:
+    return InboundWorkflow(db_session, FakeStorage(), whatsapp or FakeWhatsApp(), reader)
+
+
+class BoxReader:
+    """Reads the same label whatever the bytes are."""
+
+    def __init__(self, label: LabelReading):
+        self.label = label
+
+    async def read(self, content: bytes, mime_type: str) -> LabelReading:
+        return self.label
+
+
+@pytest.mark.anyio
+async def test_the_caregiver_uploads_a_photo_for_a_medicine_the_patient_did_not_send(db_session):
+    seed(db_session)
+    approve(db_session)
+    whatsapp = FakeWhatsApp()
+    workflow = upload_workflow(db_session, BoxReader(readable("Calvexa", "500 mg")), whatsapp)
+
+    # The caregiver picks the medicine in the app, so the photo goes to that medicine.
+    result = await workflow.ingest_caregiver_upload(
+        case_id="case_photo_01", medication_id="SYN-MED-002", content=JPEG, mime_type="image/jpeg"
+    )
+
+    photo = db_session.query(InboundMedia).one()
+    assert result == "received"
+    assert (photo.medication_id, photo.check_status, photo.sender_role) == (
+        "SYN-MED-002",
+        "matched",
+        "caregiver",
+    )
+    assert whatsapp.sent == []  # the app shows the result; nothing goes out on WhatsApp
+    view = CareJourneyService(db_session).caregiver("case_photo_01")
+    assert [(m["photoStatus"], m["canUploadPhoto"]) for m in view["medications"]] == [
+        ("missing", True),
+        ("received", False),
+    ]
+    # A photo on WhatsApp now fills the box that is still waiting.
+    await send_photo(
+        upload_workflow(db_session, FakeReader({"m1": readable("Zentorin", "5 mg")})), 1
+    )
+    assert {a.type for a in db_session.query(Alert)} == {"medicine_photos_ready"}
+
+
+@pytest.mark.anyio
+async def test_an_unclear_upload_can_be_sent_again_and_a_mismatch_alerts_a_person(db_session):
+    seed(db_session)
+    approve(db_session)
+    upload = {"case_id": "case_photo_01", "medication_id": "SYN-MED-001", "mime_type": "image/jpeg"}
+
+    unclear = await upload_workflow(db_session, BoxReader(UNREADABLE)).ingest_caregiver_upload(
+        content=JPEG, **upload
+    )
+    wrong = await upload_workflow(
+        db_session, BoxReader(readable("Calvexa", "500 mg"))
+    ).ingest_caregiver_upload(content=JPEG + b"2", **upload)
+
+    # The caregiver chose the medicine, so a wrong box is flagged, not moved to another one.
+    assert (unclear, wrong) == ("unclear", "received")
+    assert [
+        p.check_status for p in db_session.query(InboundMedia).order_by(InboundMedia.received_at)
+    ] == [
+        "unreadable",
+        "different_medicine",
+    ]
+    assert {a.type for a in db_session.query(Alert)} == {"medicine_photo_mismatch"}
+
+
+@pytest.mark.anyio
+async def test_caregiver_upload_is_refused_when_it_is_not_needed_or_not_allowed(db_session):
+    upload = {"case_id": "case_photo_01", "content": JPEG, "mime_type": "image/jpeg"}
+    seed(db_session)
+    workflow = upload_workflow(db_session, BoxReader(readable("Zentorin", "5 mg")))
+
+    with pytest.raises(PhotoUploadRejected, match="journey_not_approved"):
+        await workflow.ingest_caregiver_upload(medication_id="SYN-MED-001", **upload)
+    approve(db_session)
+    with pytest.raises(LookupError):
+        await workflow.ingest_caregiver_upload(medication_id="SYN-MED-404", **upload)
+    await workflow.ingest_caregiver_upload(medication_id="SYN-MED-001", **upload)
+    with pytest.raises(PhotoUploadRejected, match="photo_already_received"):
+        await workflow.ingest_caregiver_upload(medication_id="SYN-MED-001", **upload)
+
+
+@pytest.mark.anyio
+async def test_no_upload_without_a_caregiver_registered_at_intake(db_session):
+    seed(db_session, caregiver=None)
+    approve(db_session)
+
+    with pytest.raises(PhotoUploadRejected, match="caregiver_not_registered"):
+        await upload_workflow(db_session).ingest_caregiver_upload(
+            case_id="case_photo_01",
+            medication_id="SYN-MED-001",
+            content=JPEG,
+            mime_type="image/jpeg",
+        )
+    view = CareJourneyService(db_session).caregiver("case_photo_01")
+    assert [m["canUploadPhoto"] for m in view["medications"]] == [False, False]
+
+
+def test_the_upload_route_takes_images_only_and_never_from_the_insurer(client, db_session):
+    from app.services.object_storage import get_object_storage
+
+    def session_headers(username: str) -> dict[str, str]:
+        body = {"username": username, "password": "synthetic-demo-password"}
+        token = client.post("/auth/login", json=body).json()["accessToken"]
+        return {"Authorization": f"Bearer {token}"}
+
+    client.app.dependency_overrides[get_object_storage] = FakeStorage
+    seed(db_session)
+    approve(db_session)
+    url = "/internal/caregiver/cases/case_photo_01/medications/SYN-MED-001/photo"
+    caregiver = session_headers("caregiver")
+    insurer = session_headers("insurer")
+    jpeg = {"Content-Type": "image/jpeg"}
+
+    assert client.post(url, content=JPEG, headers={**insurer, **jpeg}).status_code == 403
+    assert client.post(url, content=b"%PDF-1.4", headers={**caregiver, **jpeg}).status_code == 415
+    pdf = {**caregiver, "Content-Type": "application/pdf"}
+    assert client.post(url, content=JPEG, headers=pdf).status_code == 415
+    sent = client.post(url, content=JPEG, headers={**caregiver, **jpeg})
+    assert (sent.status_code, sent.json()) == (201, {"result": "received"})
+    again = client.post(url, content=JPEG, headers={**caregiver, **jpeg})
+    assert (again.status_code, again.json()) == (409, {"error": "photo_already_received"})
+
+
 class LiveFakes:
     def __init__(self):
         self.calls: list[tuple] = []
@@ -382,6 +513,10 @@ class LiveFakes:
     async def send_template(self, to, name, language, values):
         self.calls.append(("template", to, name, language, values))
         return "wamid.template"
+
+    async def send_photo_reminder(self, to, media_id=None, language="ar"):
+        self.calls.append(("dose_question", to, media_id, language))
+        return "wamid.question"
 
 
 def live_adapter(fakes, template: str | None = None) -> LiveJourneyDeliveryAdapter:
@@ -432,8 +567,18 @@ def test_the_template_wording_is_the_approved_request_wording():
 
 
 @pytest.mark.anyio
-async def test_live_reminder_without_a_checked_photo_sends_the_voice_note_alone():
+async def test_live_reminder_without_a_checked_photo_still_asks_taken_or_not():
     fakes = LiveFakes()
-    ref = await live_adapter(fakes).deliver(payload("medication_reminder", voice_script="Dose"))
+    reminder = payload("medication_reminder", voice_script="Dose", language="en")
+    ref = await live_adapter(fakes).deliver(reminder)
+    assert ref == "wamid.audio,wamid.question"
+    # The voice note, then the 1 / 2 question with no photo on it.
+    assert fakes.calls == [("audio", PATIENT), ("dose_question", PATIENT, None, "en")]
+
+
+@pytest.mark.anyio
+async def test_the_discharge_voice_note_asks_no_dose_question():
+    fakes = LiveFakes()
+    ref = await live_adapter(fakes).deliver(payload("discharge_voice_note", voice_script="Hello"))
     assert ref == "wamid.audio"
     assert fakes.calls == [("audio", PATIENT)]

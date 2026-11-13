@@ -1,4 +1,5 @@
 import json
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from hashlib import sha256
@@ -19,6 +20,7 @@ from app.schemas.care_journey import (
     CareJourneyContent,
     CareJourneyCreate,
 )
+from app.services.analytics import SCHEDULED, case_stage
 from app.services.discharge_parser import DischargeExtraction, draft_medications
 from app.services.dose_facts import dose_facts, reminder_medication_id, reminder_run_times
 from app.services.insurer_systems import MockInsurerSystems
@@ -26,6 +28,20 @@ from app.services.medicine_photos import MISMATCH
 from app.services.patient_identifiers import find_identifier
 
 REPEAT_DAYS = {"none": 0, "daily": 1, "every_2_days": 2, "weekly": 7}
+
+
+_STAGE_ORDER = {"needs_attention": 0, "needs_review": 1, "active": 2, "completed": 3}
+
+
+def _worklist_key(case: dict) -> tuple:
+    stage = case["stage"]
+    if stage == "active":
+        when = case["nextStepAt"].timestamp()
+    elif stage == "completed":
+        when = -case["approvedAt"].timestamp()
+    else:
+        when = case["createdAt"].timestamp()
+    return _STAGE_ORDER[stage], when, case["caseId"]
 
 
 class JourneyNotFound(RuntimeError):
@@ -96,20 +112,54 @@ class CareJourneyService:
             .join(PatientCase, PatientCase.id == CareJourney.case_id)
             .order_by(CareJourney.updated_at.desc(), CareJourney.case_id)
         ).all()
-        counts = dict(
-            self.session.execute(
-                select(Alert.case_id, func.count(Alert.id))
-                .where(Alert.status == "open")
-                .group_by(Alert.case_id)
-            ).all()
-        )
+        open_alerts: dict[str, list[str]] = defaultdict(list)
+        for case_id, severity in self.session.execute(
+            select(Alert.case_id, Alert.severity).where(Alert.status == "open")
+        ):
+            open_alerts[case_id].append(severity)
+        runs: dict[str, list[DeliveryRun]] = defaultdict(list)
+        for run in self.session.scalars(select(DeliveryRun)):
+            runs[run.case_id].append(run)
+        cases = []
+        for journey, patient in rows:
+            mine = runs[journey.case_id]
+            high = open_alerts[journey.case_id].count("high")
+            cases.append(
+                {
+                    "caseId": journey.case_id,
+                    "patientName": patient.patient_alias,
+                    "languageCode": journey.language_code,
+                    "reviewStatus": journey.review_status,
+                    "alertCount": len(open_alerts[journey.case_id]),
+                    "stage": case_stage(journey, mine, high),
+                    "highAlertCount": high,
+                    "failedRunCount": sum(run.status == "failed" for run in mine),
+                    "createdAt": journey.created_at,
+                    "approvedAt": journey.approved_at,
+                    "nextStepAt": min(
+                        (run.scheduled_at for run in mine if run.status in SCHEDULED),
+                        default=None,
+                    ),
+                }
+            )
+        # Worklist order: open high alerts, then the longest-waiting review, then the next
+        # scheduled step, then finished journeys (newest first).
+        return sorted(cases, key=_worklist_key)
+
+    def hospital_cases(self) -> list[dict]:
+        """What the hospital registered and where each case stands; no clinical content."""
+        rows = self.session.execute(
+            select(CareJourney, PatientCase)
+            .join(PatientCase, PatientCase.id == CareJourney.case_id)
+            .order_by(CareJourney.created_at.desc(), CareJourney.case_id)
+        ).all()
         return [
             {
                 "caseId": journey.case_id,
                 "patientName": patient.patient_alias,
-                "languageCode": journey.language_code,
+                "submittedAt": journey.created_at,
                 "reviewStatus": journey.review_status,
-                "alertCount": counts.get(journey.case_id, 0),
+                "approvedAt": journey.approved_at,
             }
             for journey, patient in rows
         ]
@@ -280,9 +330,16 @@ class CareJourneyService:
         }
 
     def alerts(self) -> list[dict]:
-        alerts = self.session.scalars(
-            select(Alert).order_by(Alert.status, Alert.created_at.desc(), Alert.id)
-        ).all()
+        # Open before resolved; open alerts by severity then longest waiting; resolved newest first.
+        alerts = sorted(
+            self.session.scalars(select(Alert)),
+            key=lambda item: (
+                item.status != "open",
+                item.severity != "high",
+                item.created_at.timestamp() * (1 if item.status == "open" else -1),
+                item.id,
+            ),
+        )
         names = dict(
             self.session.execute(
                 select(PatientCase.id, PatientCase.patient_alias).where(
@@ -300,6 +357,7 @@ class CareJourneyService:
                 "status": item.status,
                 "summary": item.summary,
                 "createdAt": item.created_at,
+                "resolvedAt": item.resolved_at,
             }
             for item in alerts
         ]
@@ -510,6 +568,8 @@ class CareJourneyService:
             for run in runs
             if run.kind == "medication_reminder"
         }
+        # A registered caregiver may upload a box photo the patient did not send, or sent unclear.
+        may_upload = journey.review_status == "approved" and bool(patient.caregiver_phone_e164)
         return {
             "caseId": case_id,
             "patientName": patient.patient_alias,
@@ -523,7 +583,12 @@ class CareJourneyService:
                         if medication["medicationId"] in reminder_ids
                         else "needs_support"
                     ),
-                    "photoStatus": self._photo_status(photos, medication["medicationId"]),
+                    "photoStatus": (
+                        status := self._photo_status(photos, medication["medicationId"])
+                    ),
+                    "canUploadPhoto": may_upload
+                    and medication["dispensed"]
+                    and status == "missing",
                 }
                 for medication in journey.medications
             ],

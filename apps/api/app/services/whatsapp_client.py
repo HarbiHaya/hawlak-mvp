@@ -45,6 +45,12 @@ class DownloadedMedia:
     mime_type: str
 
 
+DOSE_QUESTION = {
+    "ar": "اضغط 1 إذا أخذت الجرعة، أو 2 إذا لم تأخذها بعد.",
+    "en": "Press 1 if you took the dose, or 2 if you have not taken it yet.",
+}
+
+
 class WhatsAppClient:
     def __init__(
         self,
@@ -101,11 +107,14 @@ class WhatsAppClient:
         body = await self._post("messages", json=_message(to, "audio", {"id": media_id}))
         return _message_id(body)
 
-    async def send_photo_reminder(self, to: str, media_id: str) -> str:
+    async def send_photo_reminder(
+        self, to: str, media_id: str | None = None, language: str = "ar"
+    ) -> str:
+        """Asks whether the dose was taken: 1 for taken, 2 for not yet. The patient's checked
+        box photo sits on top when there is one."""
         interactive = {
             "type": "button",
-            "header": {"type": "image", "image": {"id": media_id}},
-            "body": {"text": "اضغط 1 إذا أخذت الجرعة، أو 2 إذا لم تأخذها بعد."},
+            "body": {"text": DOSE_QUESTION.get(language, DOSE_QUESTION["ar"])},
             "action": {
                 "buttons": [
                     {"type": "reply", "reply": {"id": "taken", "title": "1"}},
@@ -113,6 +122,8 @@ class WhatsAppClient:
                 ]
             },
         }
+        if media_id:
+            interactive["header"] = {"type": "image", "image": {"id": media_id}}
         body = await self._post("messages", json=_message(to, "interactive", interactive))
         return _message_id(body)
 

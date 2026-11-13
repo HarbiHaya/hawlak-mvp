@@ -44,6 +44,10 @@ def _dashboard_roles(method: str, path: str) -> set[str]:
         return admin | {"hospital"}
     if path == "/internal/workspace/cases":
         return admin | ({"hospital"} if method == "POST" else {"insurer"})
+    if path == "/internal/workspace/analytics" and method == "GET":
+        return admin | {"insurer"}
+    if path == "/internal/hospital/cases" and method == "GET":
+        return admin | {"hospital"}
     if path == "/internal/workspace/alerts" and method == "GET":
         return admin | {"insurer"}
     if path.startswith("/internal/workspace/alerts/") and path.endswith("/resolve"):
@@ -52,4 +56,7 @@ def _dashboard_roles(method: str, path: str) -> set[str]:
         return admin | {"insurer"}
     if path.startswith("/internal/caregiver/cases/") and method == "GET":
         return admin | {"caregiver"}
+    # Medicine photos come from the patient's side only: the caregiver, never the insurer.
+    if path.startswith("/internal/caregiver/cases/") and path.endswith("/photo"):
+        return admin | {"caregiver"} if method == "POST" else set()
     return set()

@@ -31,6 +31,10 @@ const errorMessages: Record<string, Bilingual> = {
   image_required: { ar: "ارفع صورة بصيغة JPEG أو PNG أو WebP.", en: "Upload a JPEG, PNG or WebP image." },
   invalid_image: { ar: "الصورة المرفوعة غير صالحة.", en: "The uploaded image is not valid." },
   image_size_invalid: { ar: "يجب ألا يتجاوز حجم الصورة ١٠ ميجابايت.", en: "The image must not exceed 10 MB." },
+  photo_already_received: { ar: "وصلت صورة لهذا الدواء من قبل.", en: "A photo for this medicine has already arrived." },
+  caregiver_not_registered: { ar: "لم يُسجَّل مرافق لهذه الحالة عند الخروج.", en: "No caregiver was registered for this case at discharge." },
+  journey_not_approved: { ar: "خطة المتابعة لم تُعتمد بعد.", en: "The follow-up plan is not approved yet." },
+  medication_not_found: { ar: "هذا الدواء غير موجود في الخطة المعتمدة.", en: "This medicine is not in the approved plan." },
   storage_unavailable: { ar: "خدمة التخزين غير متاحة حالياً. حاول لاحقاً.", en: "File storage is temporarily unavailable. Try again later." },
 };
 

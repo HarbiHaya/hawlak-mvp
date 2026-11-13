@@ -93,18 +93,19 @@ class LiveJourneyDeliveryAdapter:
         if payload.kind == "discharge_voice_note":
             return voice_message_id
 
-        if not payload.image_object_key or not payload.image_content_type:
-            return voice_message_id  # No checked box photo yet: the voice reminder goes alone.
-        image = self._storage.get_bytes(payload.image_object_key)
-        suffix = PurePosixPath(payload.image_object_key).suffix or ".jpg"
-        image_id = await self._whatsapp.upload_image(
-            image,
-            f"medicine-{payload.run_id}{suffix}",
-            payload.image_content_type,
-        )
+        # Every reminder asks "taken (1) or not yet (2)". The checked box photo goes on the
+        # question when there is one; without one the question goes with no photo.
+        image_id = None
+        if payload.image_object_key and payload.image_content_type:
+            image = self._storage.get_bytes(payload.image_object_key)
+            suffix = PurePosixPath(payload.image_object_key).suffix or ".jpg"
+            image_id = await self._whatsapp.upload_image(
+                image,
+                f"medicine-{payload.run_id}{suffix}",
+                payload.image_content_type,
+            )
         reminder_message_id = await self._whatsapp.send_photo_reminder(
-            payload.phone_e164,
-            image_id,
+            payload.phone_e164, image_id, payload.language
         )
         return f"{voice_message_id},{reminder_message_id}"
 

@@ -13,6 +13,9 @@ export interface NavItem {
   labelAr: string;
   labelEn: string;
   icon: string;
+  /** Admin navigation groups items under the workspace they belong to. */
+  group?: "hospital" | "insurer" | "caregiver";
+  showsAlertCount?: boolean;
 }
 
 const routesByRole: Record<UserRole, ProductRoute[]> = {
@@ -37,17 +40,17 @@ const navByRole: Record<UserRole, NavItem[]> = {
   ],
   insurer: [
     { path: "/insurer/cases", labelAr: "الحالات", labelEn: "Cases", icon: "briefcase-medical" },
-    { path: "/insurer/alerts", labelAr: "التنبيهات", labelEn: "Alerts", icon: "bell" },
+    { path: "/insurer/alerts", labelAr: "التنبيهات", labelEn: "Alerts", icon: "bell", showsAlertCount: true },
   ],
   caregiver: [
     { path: "/caregiver/status", labelAr: "متابعة الحالة", labelEn: "Patient follow-up", icon: "heart-handshake" },
   ],
   admin: [
     { path: "/admin", labelAr: "نظرة عامة", labelEn: "Overview", icon: "layout-dashboard" },
-    { path: "/admin/hospital", labelAr: "المستشفى", labelEn: "Hospital", icon: "hospital" },
-    { path: "/admin/insurer/cases", labelAr: "حالات الرعاية المتكاملة", labelEn: "Integrated care cases", icon: "briefcase-medical" },
-    { path: "/admin/insurer/alerts", labelAr: "التنبيهات", labelEn: "Alerts", icon: "bell" },
-    { path: "/admin/caregiver", labelAr: "مرافق المريض", labelEn: "Caregiver", icon: "heart-handshake" },
+    { path: "/admin/hospital", labelAr: "تسجيل حالة", labelEn: "Register case", icon: "file-plus-2", group: "hospital" },
+    { path: "/admin/insurer/cases", labelAr: "الحالات", labelEn: "Cases", icon: "briefcase-medical", group: "insurer" },
+    { path: "/admin/insurer/alerts", labelAr: "التنبيهات", labelEn: "Alerts", icon: "bell", group: "insurer", showsAlertCount: true },
+    { path: "/admin/caregiver", labelAr: "متابعة الحالة", labelEn: "Patient follow-up", icon: "heart-handshake", group: "caregiver" },
   ],
 };
 
@@ -62,4 +65,20 @@ export function resolveRoute(pathname: string, role: UserRole): ProductRoute {
 
 export function navItems(role: UserRole): NavItem[] {
   return navByRole[role];
+}
+
+/** Path of a sibling view in the same role scope, e.g. insurer cases from the alerts page. */
+export function viewPath(role: UserRole, view: ProductView, insurerSection?: InsurerSection): string | null {
+  return routesByRole[role].find((route) => route.view === view && (insurerSection === undefined || route.insurerSection === insurerSection))?.path ?? null;
+}
+
+export function queryParam(name: string): string | null {
+  return new URLSearchParams(window.location.search).get(name);
+}
+
+/** Updates one query parameter without adding a history entry. */
+export function replaceQueryParam(name: string, value: string | null) {
+  const url = new URL(window.location.href);
+  if (value) url.searchParams.set(name, value); else url.searchParams.delete(name);
+  window.history.replaceState(window.history.state, "", `${url.pathname}${url.search}`);
 }

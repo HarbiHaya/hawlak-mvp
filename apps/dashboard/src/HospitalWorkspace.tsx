@@ -1,12 +1,46 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type DragEvent, type FormEvent } from "react";
 
-import { displayError, type Locale } from "./App";
+import { Icon } from "./Icon";
 import { type DialectCode, type HawlakApi } from "./api";
+import { displayError, type Locale } from "./i18n";
+import { CopyButton, Field, Notice, PageHeader, Segmented } from "./ui";
 
 const labels = {
-  ar: { title: "تسجيل حالة خروج", subtitle: "أدخل بيانات المريض وارفع ملخص الخروج. يراجع فريق الرعاية المتكاملة لدى شركة التأمين كل حالة قبل إرسال أي رسالة إلى المريض.", name: "الاسم الكامل للمريض كما هو مسجل", address: "صيغة المخاطبة المفضلة (اختياري)", addressHint: "مثال: أبو محمد. تُستخدم في الرسائل الصوتية فقط.", phone: "رقم جوال المريض", caregiverPhone: "رقم جوال مقدم الرعاية (اختياري)", caregiverHint: "بموافقته. يستطيع إرسال صور علب الأدوية نيابةً عن المريض.", member: "رقم عضوية التأمين", memberHint: "كما يظهر في بطاقة التأمين", language: "لغة التواصل", dialect: "اللهجة", file: "ملخص الخروج (PDF)", pick: "اختيار ملف PDF", submit: "إرسال لمراجعة شركة التأمين", sending: "جارٍ الإرسال…", done: "أُرسلت الحالة لمراجعة شركة التأمين", reference: "رقم الحالة", newCase: "تسجيل حالة أخرى", share: "شارك رقم الحالة مع مرافق المريض ليتمكن من متابعة سيرها." },
-  en: { title: "Register a discharge case", subtitle: "Enter the patient's details and upload the discharge summary. The insurer's integrated care team reviews every case before any message is sent to the patient.", name: "Patient full name, as registered", address: "Preferred form of address (optional)", addressHint: "For example: Abu Mohammed. Used in voice messages only.", phone: "Patient mobile number", caregiverPhone: "Caregiver mobile number (optional)", caregiverHint: "With their consent. They can send medicine-box photos for the patient.", member: "Insurance member ID", memberHint: "As shown on the insurance card", language: "Communication language", dialect: "Arabic dialect", file: "Discharge summary (PDF)", pick: "Select a PDF file", submit: "Submit for insurer review", sending: "Submitting…", done: "Case submitted for insurer review", reference: "Case reference", newCase: "Register another case", share: "Share this case reference with the patient's caregiver so they can follow its progress." },
+  ar: {
+    title: "تسجيل حالة خروج", subtitle: "تراجع شركة التأمين كل حالة قبل إرسال أي رسالة إلى المريض.",
+    patient: "المريض", contact: "التواصل والتغطية", communication: "لغة التواصل", document: "ملخص الخروج",
+    name: "الاسم الكامل كما هو مسجل", address: "صيغة المخاطبة", addressHint: "مثال: أبو محمد. تُستخدم في الرسائل الصوتية.", optional: "اختياري",
+    phone: "رقم الجوال", phoneHint: "بالصيغة الدولية، مثل ‎+9665XXXXXXXX", phoneError: "أدخل الرقم بالصيغة الدولية مبدوءاً بـ +.",
+    caregiverPhone: "رقم جوال مقدم الرعاية", caregiverHint: "بموافقته. يستطيع إرسال صور علب الأدوية نيابةً عن المريض.", caregiverError: "أدخل رقماً دولياً مختلفاً عن رقم المريض، أو اترك الحقل فارغاً.",
+    member: "رقم عضوية التأمين", memberHint: "كما في بطاقة التأمين", memberError: "من ٤ إلى ٣٢ حرفاً أو رقماً أو شرطة.",
+    language: "اللغة", dialect: "اللهجة", nameError: "أدخل اسم المريض.",
+    pick: "اسحب ملف PDF هنا أو اختر ملفاً", pickHint: "PDF بحد أقصى ٥ ميجابايت", change: "تغيير", fileError: "اختر ملف PDF لا يتجاوز ٥ ميجابايت.",
+    submit: "إرسال للمراجعة", sending: "جارٍ الإرسال…", required: "جميع الحقول مطلوبة ما لم يُذكر خلاف ذلك.",
+    done: "أُرسلت الحالة للمراجعة", reference: "رقم الحالة", newCase: "تسجيل حالة أخرى", share: "شارك رقم الحالة مع مرافق المريض لمتابعة سيرها.",
+  },
+  en: {
+    title: "Register a discharge case", subtitle: "The insurer reviews every case before any message reaches the patient.",
+    patient: "Patient", contact: "Contact and coverage", communication: "Communication", document: "Discharge summary",
+    name: "Full name, as registered", address: "Form of address", addressHint: "For example: Abu Mohammed. Used in voice messages.", optional: "optional",
+    phone: "Mobile number", phoneHint: "International format, e.g. +9665XXXXXXXX", phoneError: "Enter the number in international format, starting with +.",
+    caregiverPhone: "Caregiver mobile number", caregiverHint: "With their consent. They can send medicine-box photos for the patient.", caregiverError: "Enter an international number different from the patient's, or leave it blank.",
+    member: "Insurance member ID", memberHint: "As shown on the insurance card", memberError: "4–32 letters, digits or hyphens.",
+    language: "Language", dialect: "Dialect", nameError: "Enter the patient's name.",
+    pick: "Drop a PDF here or choose a file", pickHint: "PDF, up to 5 MB", change: "Change", fileError: "Choose a PDF file of up to 5 MB.",
+    submit: "Submit for review", sending: "Submitting…", required: "All fields are required unless marked optional.",
+    done: "Case submitted for review", reference: "Case reference", newCase: "Register another case", share: "Share the case reference with the patient's caregiver so they can follow its progress.",
+  },
 } as const;
+
+const MAX_PDF_BYTES = 5 * 1024 * 1024;
+const dialects: Array<{ value: DialectCode; ar: string; en: string }> = [
+  { value: "ar-SA-najdi", ar: "نجدي", en: "Najdi" },
+  { value: "ar-SA-hijazi", ar: "حجازي", en: "Hijazi" },
+  { value: "ar-SA-janoubi", ar: "جنوبي", en: "Southern" },
+];
+
+const formatSize = (bytes: number) => bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+const isPdf = (file: File) => file.type === "application/pdf" || file.name.toLowerCase().endsWith(".pdf");
 
 export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Locale }) {
   const t = labels[locale];
@@ -18,37 +52,112 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
   const [language, setLanguage] = useState<"ar" | "en">("ar");
   const [dialect, setDialect] = useState<DialectCode>("ar-SA-najdi");
   const [document, setDocument] = useState<File | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [busy, setBusy] = useState(false);
   const [created, setCreated] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const phoneValid = /^\+[1-9]\d{7,14}$/.test(phone);
-  const caregiverValid = !caregiverPhone || (/^\+[1-9]\d{7,14}$/.test(caregiverPhone) && caregiverPhone !== phone);
-  const memberValid = /^[A-Za-z0-9-]{4,32}$/.test(memberId);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  const errors = {
+    name: patientName.trim() ? null : t.nameError,
+    phone: /^\+[1-9]\d{7,14}$/.test(phone) ? null : t.phoneError,
+    caregiver: !caregiverPhone || (/^\+[1-9]\d{7,14}$/.test(caregiverPhone) && caregiverPhone !== phone) ? null : t.caregiverError,
+    member: /^[A-Za-z0-9-]{4,32}$/.test(memberId) ? null : t.memberError,
+    file: document && isPdf(document) && document.size <= MAX_PDF_BYTES ? null : t.fileError,
+  };
+  const shown = (key: keyof typeof errors) => (touched[key] ? errors[key] : null);
+  const touch = (key: string) => setTouched((current) => ({ ...current, [key]: true }));
+
+  function chooseFile(file: File | undefined) {
+    if (!file) return;
+    setDocument(file);
+    touch("file");
+  }
+
+  function onDrop(event: DragEvent) {
+    event.preventDefault();
+    setDragging(false);
+    chooseFile(event.dataTransfer.files?.[0]);
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
-    if (!document || !phoneValid || !memberValid || !caregiverValid) return;
+    setTouched({ name: true, phone: true, caregiver: true, member: true, file: true });
+    const firstInvalid = (Object.keys(errors) as Array<keyof typeof errors>).find((key) => errors[key]);
+    if (firstInvalid || !document) {
+      formRef.current?.querySelector<HTMLElement>(`[data-field="${firstInvalid}"]`)?.focus();
+      return;
+    }
     setBusy(true); setError(null);
     try {
-      const result = await api.submitDischargePacket({ document, patientFullName: patientName, preferredAddress, phoneE164: phone, caregiverPhoneE164: caregiverPhone, memberId, languageCode: language, dialectCode: dialect });
+      const result = await api.submitDischargePacket({ document, patientFullName: patientName.trim(), preferredAddress: preferredAddress.trim(), phoneE164: phone, caregiverPhoneE164: caregiverPhone || undefined, memberId, languageCode: language, dialectCode: dialect });
       setCreated(result.caseId);
-    } catch (caught) { setError(displayError(caught, locale)); } finally { setBusy(false); }
+    } catch (caught) { setError(displayError(caught, locale)); }
+    finally { setBusy(false); }
   }
 
-  if (created) return <section className="success-state"><span className="success-ring">✓</span><h1>{t.done}</h1><small>{t.reference}</small><code>{created}</code><p>{t.share}</p><button className="button button--primary" onClick={() => setCreated(null)}>{t.newCase}</button></section>;
+  function reset() {
+    setPatientName(""); setPreferredAddress(""); setPhone(""); setCaregiverPhone(""); setMemberId(""); setDocument(null);
+    setTouched({}); setError(null); setCreated(null);
+  }
 
-  return <div className="workspace workspace--narrow">
-    <header className="page-title-block"><div><h1>{t.title}</h1><p>{t.subtitle}</p></div></header>
-    {error && <div className="notice notice--danger" role="alert">{error}</div>}
-    <form className="form-panel" onSubmit={(event) => void submit(event)}><div className="form-grid">
-      <label>{t.name}<input required value={patientName} onChange={(event) => setPatientName(event.target.value)} /></label>
-      <label>{t.address}<input value={preferredAddress} onChange={(event) => setPreferredAddress(event.target.value)} placeholder={t.addressHint} /></label>
-      <label>{t.phone}<input required dir="ltr" inputMode="tel" value={phone} onChange={(event) => setPhone(event.target.value.replace(/\s/g, ""))} placeholder="+9665XXXXXXXX" /></label>
-      <label>{t.caregiverPhone}<input dir="ltr" inputMode="tel" value={caregiverPhone} aria-invalid={!caregiverValid} onChange={(event) => setCaregiverPhone(event.target.value.replace(/\s/g, ""))} placeholder="+9665XXXXXXXX" aria-describedby="caregiver-hint" /><small id="caregiver-hint" className="field-hint">{t.caregiverHint}</small></label>
-      <label>{t.member}<input required dir="ltr" value={memberId} onChange={(event) => setMemberId(event.target.value.trim().toUpperCase())} placeholder="SYN-4471203" aria-describedby="member-hint" /><small id="member-hint" className="field-hint">{t.memberHint}</small></label>
-      <label>{t.language}<select value={language} onChange={(event) => setLanguage(event.target.value as "ar" | "en")}><option value="ar">العربية</option><option value="en">English</option></select></label>
-      {language === "ar" && <label className="field-span">{t.dialect}<select value={dialect} onChange={(event) => setDialect(event.target.value as DialectCode)}><option value="ar-SA-najdi">نجدي · Najdi</option><option value="ar-SA-hijazi">حجازي · Hijazi</option><option value="ar-SA-janoubi">جنوبي · Southern</option></select></label>}
-      <label className="upload-field field-span"><span>{t.file}</span><input type="file" accept="application/pdf,.pdf" required onChange={(event) => setDocument(event.target.files?.[0] ?? null)} /><b>{document?.name ?? t.pick}</b></label>
-    </div><footer><button className="button button--primary" disabled={busy || !patientName || !phoneValid || !memberValid || !caregiverValid || !document}>{busy ? t.sending : t.submit}</button></footer></form>
+  if (created) return <div className="page page--narrow">
+    <section className="panel result" aria-live="polite">
+      <span className="result__icon"><Icon name="check" size={24} /></span>
+      <h1 tabIndex={-1} data-page-title>{t.done}</h1>
+      <span className="muted">{t.reference}</span>
+      <span className="reference"><code dir="ltr">{created}</code><CopyButton value={created} locale={locale} /></span>
+      <p>{t.share}</p>
+      <button className="button button--primary" onClick={reset}><Icon name="plus" size={16} />{t.newCase}</button>
+    </section>
+  </div>;
+
+  return <div className="page page--narrow">
+    <PageHeader title={t.title} description={t.subtitle} />
+    {error && <div style={{ marginBottom: 16 }}><Notice tone="danger">{error}</Notice></div>}
+    <form ref={formRef} className="panel" onSubmit={(event) => void submit(event)} noValidate>
+      <section className="form-section">
+        <h2>{t.patient}</h2>
+        <div className="form-section__fields">
+          <Field label={t.name} error={shown("name")}>{({ id, describedBy, invalid }) => <input id={id} data-field="name" className="input" autoComplete="off" value={patientName} aria-describedby={describedBy} aria-invalid={invalid} aria-required="true" onBlur={() => touch("name")} onChange={(event) => setPatientName(event.target.value)} />}</Field>
+          <Field label={t.address} optional={t.optional} hint={t.addressHint}>{({ id, describedBy }) => <input id={id} className="input" autoComplete="off" value={preferredAddress} aria-describedby={describedBy} onChange={(event) => setPreferredAddress(event.target.value)} />}</Field>
+        </div>
+      </section>
+      <section className="form-section">
+        <h2>{t.contact}</h2>
+        <div className="form-section__fields">
+          <Field label={t.phone} hint={t.phoneHint} error={shown("phone")}>{({ id, describedBy, invalid }) => <input id={id} data-field="phone" className="input" dir="ltr" type="tel" inputMode="tel" autoComplete="off" value={phone} aria-describedby={describedBy} aria-invalid={invalid} aria-required="true" onBlur={() => touch("phone")} onChange={(event) => setPhone(event.target.value.replace(/[\s-]/g, ""))} placeholder="+9665XXXXXXXX" />}</Field>
+          <Field label={t.caregiverPhone} optional={t.optional} hint={t.caregiverHint} error={shown("caregiver")}>{({ id, describedBy, invalid }) => <input id={id} data-field="caregiver" className="input" dir="ltr" type="tel" inputMode="tel" autoComplete="off" value={caregiverPhone} aria-describedby={describedBy} aria-invalid={invalid} onBlur={() => touch("caregiver")} onChange={(event) => setCaregiverPhone(event.target.value.replace(/[\s-]/g, ""))} placeholder="+9665XXXXXXXX" />}</Field>
+          <Field label={t.member} hint={t.memberHint} error={shown("member")}>{({ id, describedBy, invalid }) => <input id={id} data-field="member" className="input mono" dir="ltr" autoComplete="off" value={memberId} aria-describedby={describedBy} aria-invalid={invalid} aria-required="true" onBlur={() => touch("member")} onChange={(event) => setMemberId(event.target.value.trim().toUpperCase())} placeholder="SYN-4471203" />}</Field>
+        </div>
+      </section>
+      <section className="form-section">
+        <h2>{t.communication}</h2>
+        <div className="form-section__fields">
+          <div className="field"><span className="field__label">{t.language}</span><Segmented block label={t.language} value={language} onChange={setLanguage} options={[{ value: "ar", label: "العربية" }, { value: "en", label: "English" }]} /></div>
+          {language === "ar" && <div className="field"><span className="field__label">{t.dialect}</span><Segmented block label={t.dialect} value={dialect} onChange={setDialect} options={dialects.map((item) => ({ value: item.value, label: item[locale] }))} /></div>}
+        </div>
+      </section>
+      <section className="form-section">
+        <h2>{t.document}</h2>
+        <div className="field">
+          <div className={`dropzone${dragging ? " is-dragging" : ""}${document ? " has-file" : ""}`} onDragOver={(event) => { event.preventDefault(); setDragging(true); }} onDragLeave={() => setDragging(false)} onDrop={onDrop}>
+            <span className="dropzone__icon"><Icon name={document ? "file" : "upload"} size={18} /></span>
+            <span className="dropzone__text">
+              <b>{document ? document.name : t.pick}</b>
+              <small>{document ? formatSize(document.size) : t.pickHint}</small>
+            </span>
+            {document && <span className="button button--sm" aria-hidden="true">{t.change}</span>}
+            <input id="discharge-file" data-field="file" type="file" accept="application/pdf,.pdf" aria-label={t.document} aria-invalid={!!shown("file")} aria-describedby={shown("file") ? "discharge-file-error" : undefined} onChange={(event) => chooseFile(event.target.files?.[0])} />
+          </div>
+          {shown("file") && <span id="discharge-file-error" className="field__error">{t.fileError}</span>}
+        </div>
+      </section>
+      <footer className="form-footer">
+        <span className="muted">{t.required}</span>
+        <button className="button button--primary button--lg" disabled={busy}>{busy ? t.sending : t.submit}</button>
+      </footer>
+    </form>
   </div>;
 }

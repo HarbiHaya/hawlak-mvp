@@ -1,54 +1,106 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 
-import { displayError, type Locale } from "./App";
+import { Icon } from "./Icon";
 import type { CaregiverCase, HawlakApi } from "./api";
+import { displayError, formatDateTime, formatNumber, formatTime, type Locale } from "./i18n";
+import { queryParam, replaceQueryParam } from "./routing";
+import { Badge, EmptyState, Field, Notice, PageHeader } from "./ui";
 
 const labels = {
   ar: {
-    title: "متابعة حالة المريض", subtitle: "اطّلع على حالة الأدوية وموعد مكالمة المتابعة القادمة والتنبيهات المفتوحة.", caseId: "رقم الحالة",
-    open: "عرض الحالة", loading: "جارٍ التحميل…", medications: "الأدوية", attention: "تتطلب متابعة", noAlerts: "لا توجد تنبيهات مفتوحة.",
-    scheduled: "التذكير مُفعّل", needs_support: "يتطلب دعماً", empty: "أدخل رقم الحالة الذي زوّدك به المستشفى أو المريض.",
-    nextCall: "مكالمة المتابعة القادمة", noCall: "لا توجد مكالمة متابعة مجدولة.", alertCount: "عدد التنبيهات المفتوحة", underReview: "خطة المتابعة قيد المراجعة لدى شركة التأمين. ستظهر الأدوية ومواعيد المكالمات بعد اعتمادها.",
+    title: "متابعة الحالة", caseId: "رقم الحالة", caseHint: "زوّدك به المستشفى عند الخروج.", open: "عرض", loading: "جارٍ التحميل…",
+    medications: "الأدوية", status: "حالة الخطة", nextCall: "المكالمة القادمة", alerts: "تنبيهات مفتوحة",
+    approved: "معتمدة", underReview: "قيد المراجعة", noCall: "لا توجد", none: "لا توجد",
+    scheduled: "التذكير مفعّل", needs_support: "يتطلب دعماً", reviewNotice: "خطة المتابعة قيد المراجعة لدى شركة التأمين. تظهر مواعيد التذكيرات والمكالمات بعد اعتمادها.",
+    alertNotice: "يتابع فريق الرعاية {n} تنبيه مفتوح لهذه الحالة.", empty: "أدخل رقم الحالة", emptyHint: "تظهر هنا حالة الأدوية والمكالمة القادمة والتنبيهات.",
+    noMeds: "لا توجد أدوية في الخطة.", updated: "آخر تحديث {time}", refresh: "تحديث", change: "حالة أخرى",
   },
   en: {
-    title: "Patient follow-up", subtitle: "View medication status, the next follow-up call and any open alerts.", caseId: "Case reference",
-    open: "View case", loading: "Loading…", medications: "Medications", attention: "Requires attention", noAlerts: "There are no open alerts.",
-    scheduled: "Reminder active", needs_support: "Support required", empty: "Enter the case reference provided by the hospital or the patient.",
-    nextCall: "Next follow-up call", noCall: "No follow-up call is scheduled.", alertCount: "Open alerts", underReview: "The follow-up plan is under review by the insurer. Medications and call times will appear once it is approved.",
+    title: "Patient follow-up", caseId: "Case reference", caseHint: "Provided by the hospital at discharge.", open: "View", loading: "Loading…",
+    medications: "Medications", status: "Plan status", nextCall: "Next call", alerts: "Open alerts",
+    approved: "Approved", underReview: "Under review", noCall: "None scheduled", none: "None",
+    scheduled: "Reminder active", needs_support: "Support required", reviewNotice: "The follow-up plan is under review by the insurer. Reminder and call times appear once it is approved.",
+    alertNotice: "The care team is following up on {n} open alerts for this case.", empty: "Enter a case reference", emptyHint: "Medication status, the next call and alerts appear here.",
+    noMeds: "No medications in the plan.", updated: "Updated {time}", refresh: "Refresh", change: "Another case",
   },
 } as const;
 
+const LAST_CASE_KEY = "hawlak.caregiver.case";
+
+function rememberedCase(): string {
+  const fromUrl = queryParam("case");
+  if (fromUrl) return fromUrl;
+  try { return localStorage.getItem(LAST_CASE_KEY) ?? ""; } catch { return ""; }
+}
+
 export function CaregiverWorkspace({ api, locale }: { api: HawlakApi; locale: Locale }) {
   const t = labels[locale];
-  const [caseId, setCaseId] = useState("");
+  const [caseId, setCaseId] = useState(rememberedCase);
   const [data, setData] = useState<CaregiverCase | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [updatedAt, setUpdatedAt] = useState<Date | null>(null);
+  const activeId = useRef<string | null>(null);
 
-  async function load(event?: FormEvent) {
-    event?.preventDefault();
-    if (!caseId) return;
-    setBusy(true); setError(null);
-    try { setData(await api.getCaregiverCase(caseId)); }
-    catch (caught) { setError(displayError(caught, locale)); }
-    finally { setBusy(false); }
-  }
+  const load = useCallback(async (id: string, quiet = false) => {
+    const reference = id.trim();
+    if (!reference) return;
+    if (!quiet) { setBusy(true); setError(null); }
+    try {
+      const result = await api.getCaregiverCase(reference);
+      activeId.current = reference;
+      setData(result); setUpdatedAt(new Date()); setError(null);
+      replaceQueryParam("case", reference);
+      try { localStorage.setItem(LAST_CASE_KEY, reference); } catch { /* per-viewer convenience only */ }
+    } catch (caught) {
+      if (!quiet) { setData(null); setError(displayError(caught, locale)); }
+    } finally { if (!quiet) setBusy(false); }
+  }, [api, locale]);
 
+  // Reopen the last viewed case (or the ?case= link) without retyping it.
+  useEffect(() => { if (caseId) void load(caseId); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Refresh quietly while a case is open.
   useEffect(() => {
     if (!data) return;
-    const timer = window.setInterval(() => void load(), 15_000);
+    const timer = window.setInterval(() => { if (activeId.current) void load(activeId.current, true); }, 30_000);
     return () => window.clearInterval(timer);
-  }, [data, caseId]);
+  }, [data, load]);
 
-  return <div className="workspace caregiver-workspace">
-    <header className="page-title-block"><div><h1>{t.title}</h1><p>{t.subtitle}</p></div></header>
-    <form className="caregiver-search" onSubmit={(event) => void load(event)}><label>{t.caseId}<input dir="ltr" value={caseId} onChange={(event) => setCaseId(event.target.value)} placeholder="case_..." /></label><button className="button button--primary" disabled={!caseId || busy}>{busy ? t.loading : t.open}</button></form>
-    {error && <div className="notice notice--danger" role="alert">{error}</div>}
-    {!data ? <section className="empty-panel"><span>♡</span><h2>{t.empty}</h2></section> : <div className="caregiver-card">
-      <header><span className="avatar avatar--large">{data.patientName.slice(0, 1)}</span><div><h2>{data.patientName}</h2><p>{data.nextCallAt ? `${t.nextCall}: ${new Date(data.nextCallAt).toLocaleString(locale === "ar" ? "ar-SA" : "en-GB", { dateStyle: "medium", timeStyle: "short" })}` : t.noCall}</p></div></header>
-      {data.journeyStatus === "draft" && <div className="notice notice--info" role="status">{t.underReview}</div>}
-      {data.openAlertCount > 0 ? <section className="caregiver-alerts"><h3>{t.attention}</h3><article><span>!</span><div><b>{t.alertCount}: {data.openAlertCount.toLocaleString(locale === "ar" ? "ar-SA" : "en-US")}</b></div></article></section> : <div className="all-clear">✓ {t.noAlerts}</div>}
-      <section className="caregiver-medications"><h3>{t.medications}</h3>{data.medications.map((item) => <article key={item.medicationId}><span className="medicine-thumb" aria-hidden="true">▣</span><div><b>{item.displayName}</b></div><i className={`dose-state dose-state--${item.status}`}>{t[item.status]}</i></article>)}</section>
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    void load(caseId);
+  }
+
+  const approved = data?.journeyStatus === "approved";
+
+  return <div className="page page--narrow">
+    <PageHeader title={t.title} actions={data && <button type="button" className="button" disabled={busy} onClick={() => void load(data.caseId)}><Icon name="refresh" size={15} />{t.refresh}</button>} />
+    <form className="lookup" onSubmit={submit}>
+      <Field label={t.caseId} hint={t.caseHint}>{({ id, describedBy }) => <input id={id} className="input mono" dir="ltr" autoComplete="off" spellCheck={false} value={caseId} aria-describedby={describedBy} onChange={(event) => setCaseId(event.target.value.trim())} placeholder="case_…" />}</Field>
+      <button className="button button--primary" disabled={!caseId || busy}>{busy ? t.loading : t.open}</button>
+    </form>
+    {error && <div style={{ marginBottom: 16 }}><Notice tone="danger">{error}</Notice></div>}
+    {!data ? !error && <section className="panel"><EmptyState icon="heart-handshake" title={t.empty}><p>{t.emptyHint}</p></EmptyState></section> : <div style={{ display: "grid", gap: 16 }}>
+      <section className="panel">
+        <header className="panel__header"><h2 style={{ fontSize: 16 }}>{data.patientName}</h2>{updatedAt && <span className="updated">{t.updated.replace("{time}", formatTime(updatedAt, locale))}</span>}</header>
+        <div className="status-hero">
+          <div><span>{t.status}</span><b><Badge tone={approved ? "success" : "warning"}>{approved ? t.approved : t.underReview}</Badge></b></div>
+          <div><span>{t.nextCall}</span><b>{data.nextCallAt ? <bdi>{formatDateTime(data.nextCallAt, locale)}</bdi> : <span className="muted">{t.noCall}</span>}</b></div>
+          <div><span>{t.alerts}</span><b style={data.openAlertCount ? { color: "var(--danger)" } : undefined}>{data.openAlertCount ? formatNumber(data.openAlertCount, locale) : <span className="muted">{t.none}</span>}</b></div>
+        </div>
+      </section>
+      {!approved && <Notice tone="info">{t.reviewNotice}</Notice>}
+      {data.openAlertCount > 0 && <Notice tone="warning">{t.alertNotice.replace("{n}", formatNumber(data.openAlertCount, locale))}</Notice>}
+      <section className="panel">
+        <header className="panel__header"><h2>{t.medications}</h2></header>
+        {data.medications.length === 0 ? <EmptyState compact icon="pill" title={t.noMeds} />
+          : <ul className="rows">{data.medications.map((item) => <li key={item.medicationId} className="row">
+            <span className="row__icon"><Icon name="pill" size={15} /></span>
+            <div className="row__main"><b>{item.displayName}</b></div>
+            {approved && <Badge tone={item.status === "scheduled" ? "success" : "warning"}>{t[item.status]}</Badge>}
+          </li>)}</ul>}
+      </section>
     </div>}
   </div>;
 }

@@ -15,14 +15,16 @@ class ClassificationError(RuntimeError):
 
 
 class AnswerClassifier(Protocol):
-    async def classify(self, transcript: str) -> AnswerKind: ...
+    async def classify(self, transcript: str, *, question: str | None = None) -> AnswerKind: ...
 
 
 class OpenAIAnswerClassifier:
     """Classifies intent only; it never generates patient-facing language."""
 
     _SYSTEM_PROMPT = (
-        "Classify the caller's latest reply. Return red_flag when the caller reports "
+        "Classify the caller's latest reply to the question the agent just asked. Read "
+        "the reply as an answer to that question: a short yes or no takes its meaning "
+        "from the question. Return red_flag when the caller reports or confirms "
         "a symptom, warning sign, deterioration, or urgent concern. Return uncertain "
         "when meaning is unclear or confidence is low. Return transfer_request when the "
         "caller asks for a human. Return clear only when none of those conditions apply."
@@ -47,12 +49,16 @@ class OpenAIAnswerClassifier:
         self._timeout_seconds = timeout_seconds
         self._opener = opener
 
-    async def classify(self, transcript: str) -> AnswerKind:
+    async def classify(self, transcript: str, *, question: str | None = None) -> AnswerKind:
         if not transcript.strip():
             raise ClassificationError("caller reply could not be classified")
-        return await asyncio.to_thread(self._classify_sync, transcript)
+        return await asyncio.to_thread(self._classify_sync, transcript, question)
 
-    def _classify_sync(self, transcript: str) -> AnswerKind:
+    def _classify_sync(self, transcript: str, question: str | None) -> AnswerKind:
+        # The question is an approved script, so it carries no patient identifier.
+        reply = transcript
+        if question:
+            reply = f"Question asked: {question}\nCaller reply: {transcript}"
         schema = {
             "type": "object",
             "additionalProperties": False,
@@ -68,7 +74,7 @@ class OpenAIAnswerClassifier:
             "model": self._model,
             "input": [
                 {"role": "system", "content": self._SYSTEM_PROMPT},
-                {"role": "user", "content": transcript},
+                {"role": "user", "content": reply},
             ],
             "text": {
                 "format": {

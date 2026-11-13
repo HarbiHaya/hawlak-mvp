@@ -83,3 +83,15 @@ def test_finished_conversation_cannot_accept_more_answers() -> None:
         assert str(exc) == "call conversation is finished"
     else:
         raise AssertionError("finished conversation must be immutable")
+
+
+def test_current_question_is_the_one_awaiting_an_answer() -> None:
+    conversation = CallConversation(plan())
+    conversation.start()
+    assert conversation.current_question is None
+
+    conversation.next_question()
+    assert conversation.current_question == "كيف تشعر الآن؟"
+
+    conversation.record_answer(AnswerKind.CLEAR)
+    assert conversation.current_question == "هل ظهرت أي علامة تحذيرية ذكرت في تعليمات الخروج؟"

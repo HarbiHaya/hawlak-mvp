@@ -104,6 +104,13 @@ class CallConversation:
         self._started = True
         return CallAction(kind=CallActionKind.SPEAK, spoken_text=self._plan.opening_script)
 
+    @property
+    def current_question(self) -> str | None:
+        """The approved question now awaiting an answer."""
+        if 0 <= self._question_index < len(self._plan.questions):
+            return self._plan.questions[self._question_index].prompt
+        return None
+
     def next_question(self) -> CallAction:
         self._ensure_active()
         self._question_index += 1

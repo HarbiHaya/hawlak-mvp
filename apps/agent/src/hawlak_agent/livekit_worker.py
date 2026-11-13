@@ -72,7 +72,9 @@ class HawlakFollowUpAgent(Agent):
     async def on_user_turn_completed(self, turn_ctx: ChatContext, new_message: ChatMessage) -> None:
         del turn_ctx
         try:
-            answer = await self.classifier.classify(new_message.text_content or "")
+            answer = await self.classifier.classify(
+                new_message.text_content or "", question=self.conversation.current_question
+            )
         except ClassificationError:
             answer = AnswerKind.UNCERTAIN
 

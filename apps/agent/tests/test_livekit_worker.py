@@ -199,3 +199,51 @@ def test_completed_outcome_survives_room_teardown_cancellation() -> None:
         ("end", None),
         ("report_completed", "run-synthetic-001"),
     ]
+
+
+def test_worker_classifies_the_reply_together_with_its_question() -> None:
+    from livekit.agents import StopResponse
+
+    from hawlak_agent.conversation import ApprovedQuestion, CallConversation, CallPlan
+
+    plan = CallPlan(
+        id="run-synthetic-001",
+        case_id="case-synthetic-001",
+        version=1,
+        approved_at="2026-11-12T09:00:00Z",
+        phone_e164="+966500000000",
+        participant_label="Synthetic patient",
+        language="ar-SA",
+        opening_script="مرحباً.",
+        questions=(
+            ApprovedQuestion(id="breath", prompt="عندك الحين ضيق نفس شديد؟"),
+            ApprovedQuestion(id="meds", prompt="أدويتك موجودة عندك؟"),
+        ),
+        completion_script="شكراً.",
+        transfer_script="سأحول المكالمة.",
+        responder_phone_e164="+966511111111",
+    )
+    seen = []
+
+    class Classifier:
+        async def classify(self, transcript, *, question=None):
+            seen.append((transcript, question))
+            return AnswerKind.CLEAR
+
+    class Session:
+        async def say(self, text, allow_interruptions=False):
+            return None
+
+    class Agent(TestAgent):
+        session = Session()
+
+    agent = Agent(FakeOutcomeClient([]), [])
+    agent.conversation = CallConversation(plan)
+    agent.classifier = Classifier()
+    agent.conversation.start()
+    agent.conversation.next_question()
+
+    with pytest.raises(StopResponse):
+        asyncio.run(agent.on_user_turn_completed(None, SimpleNamespace(text_content="إيه")))
+
+    assert seen == [("إيه", "عندك الحين ضيق نفس شديد؟")]

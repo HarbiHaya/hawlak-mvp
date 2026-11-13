@@ -122,6 +122,7 @@ emergency numbers.
 |---|---|---|
 | Hospital to Hawlak | Case reference, routing phone, approved patient label, language, relevant discharge PDF, and member ID only if eligibility needs it | Unrelated history, claims, pricing notes, and duplicate identity documents |
 | Hawlak to drafting service | Relevant discharge instructions, reviewed medicines, language, and a pseudonymous label | Full name, phone, member ID, policy number, national ID, source filename, and caregiver identity |
+| Hawlak to label reader (live mode) | The medicine-box photo only | Phone, case ID, member ID, plan, and any patient field; the prompt forbids returning names, numbers or sticker text |
 | Hawlak to speech renderer | Exact approved script and voice configuration | Source PDF, member ID, phone, insurance record, and caregiver data |
 | Hawlak to Meta | Routing phone, minimized approved audio or text, approved medicine image, and fixed reply controls | Source PDF, national or member ID, policy data, reviewer identity, internal notes, and full name |
 | Hawlak to call providers | Routing phone, approved questions, approved transfer number, and the live audio needed for the call | Source PDF, member ID, policy data, and unrelated discharge content |
@@ -259,6 +260,8 @@ residency design.
 | Meta production sender, templates, and real delivery | **In progress** | Account, payment, templates, credentials, and rehearsal are incomplete |
 | WhatsApp `1` or `2` acknowledgement capture | **Implemented** | Inbound button reply is recorded as `taken` or `not_yet` |
 | Caregiver view | **Implemented** | Restricted case projection exists |
+| Medicine-photo label check | **Implemented** | Hawlak asks the patient or registered caregiver for each approved box by name and links each photo to that medicine by slot; the insurer uploads no images. In live mode the photo goes to the OpenAI vision model at low detail, once per identical photo, which returns only name, strength and form; code compares with the one requested medicine (and, for a box sent out of order, with the other approved medicines still waiting); mismatches alert a person; senders get fixed replies only. Pharmacy stickers can show the patient's name, so the photo itself can carry identity to OpenAI; senders are asked to photograph the printed box. In mock mode no photo leaves Hawlak |
+| Caregiver phone consent | **Planned** | The hospital enters the caregiver number at intake; recorded consent and revocation are not implemented |
 | Caregiver acknowledgement visibility | **Planned** | Current caregiver state is reminder-active, not taken/not-yet |
 | LiveKit and Telnyx call agent | **In progress** | Deterministic code and tests exist; live route and transfer are not proven |
 | Red-flag call outcome and alert | **Implemented** | Minimal outcome, workflow event, and alert creation exist in code |

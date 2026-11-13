@@ -33,7 +33,6 @@ export function displayError(error: unknown, locale: Locale): string {
     medications_required: { ar: "يجب إضافة دواء واحد على الأقل قبل الاعتماد.", en: "Add at least one medication before approval." },
     medication_details_required: { ar: "يُرجى استكمال اسم الدواء وتعليمات الجرعة لجميع الأدوية.", en: "Complete the name and dose instruction for every medication." },
     reminder_script_required: { ar: "يُرجى إدخال نص التذكير لكل دواء فُعّل له التذكير.", en: "Enter the reminder text for every medication with a reminder enabled." },
-    medication_image_requires_review: { ar: "يجب رفع صورة لكل دواء فُعّل له التذكير واعتمادها قبل الاعتماد.", en: "Upload and approve an image for every medication with a reminder before approval." },
     voice_script_required: { ar: "يُرجى إدخال نص الرسالة الصوتية أو إيقاف إرسالها.", en: "Enter the voice message text or turn the voice message off." },
     call_plan_incomplete: { ar: "يُرجى استكمال نصوص مكالمة المتابعة ورقم فريق الاستجابة، أو إيقاف المكالمة.", en: "Complete the follow-up call scripts and the responder number, or turn the call off." },
     call_time_in_past: { ar: "موعد المكالمة الأولى في الماضي. يُرجى اختيار موعد لاحق.", en: "The first call is scheduled in the past. Select a later time." },

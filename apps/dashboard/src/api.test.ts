@@ -229,28 +229,51 @@ describe("HawlakApi", () => {
     expect(new Headers(init?.headers).has("Authorization")).toBe(false);
   });
 
-  it("uploads a reviewed medication image through the case interface", async () => {
+  it("records a pharmacist's decision on a medicine-box photo", async () => {
     const fetcher = vi.fn(async (_input: RequestInfo | URL, _init?: RequestInit) =>
+      new Response(JSON.stringify({ id: "photo-1", reviewStatus: "confirmed" }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+    const api = new HawlakApi("/api", "", fetcher);
+
+    const result = await api.reviewMedicinePhoto("case-1", "photo-1", "confirmed", "SYN-PHARMACIST");
+
+    expect(result.reviewStatus).toBe("confirmed");
+    const [url, init] = fetcher.mock.calls[0] ?? [];
+    expect(url).toBe("/api/internal/workspace/cases/case-1/photos/photo-1/review");
+    expect(init?.method).toBe("POST");
+    expect(JSON.parse(String(init?.body))).toEqual({
+      decision: "confirmed",
+      reviewedBy: "SYN-PHARMACIST",
+    });
+  });
+
+  it("sends the caregiver phone with the discharge case", async () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL, _init?: RequestInit) =>
       new Response(
-        JSON.stringify({
-          objectKey: "cases/case-1/media/medicine.jpg",
-          filename: "medicine.jpg",
-          contentType: "image/jpeg",
-        }),
+        JSON.stringify(
+          String(input).endsWith("/documents")
+            ? { objectKey: "synthetic/case-new.pdf", filename: "d.pdf" }
+            : { caseId: "case-new", reviewStatus: "draft" },
+        ),
         { status: 201, headers: { "Content-Type": "application/json" } },
       ),
     );
     const api = new HawlakApi("/api", "", fetcher);
-    const image = new File(["synthetic"], "medicine.jpg", { type: "image/jpeg" });
 
-    const result = await api.uploadMedicationImage("case-1", image);
+    await api.submitDischargePacket({
+      document: new File(["synthetic"], "d.pdf", { type: "application/pdf" }),
+      patientFullName: "Synthetic Patient",
+      phoneE164: "+966500000001",
+      caregiverPhoneE164: "+966500000002",
+      languageCode: "en",
+      dialectCode: "ar-SA-najdi",
+    });
 
-    expect(result.objectKey).toBe("cases/case-1/media/medicine.jpg");
-    const [url, init] = fetcher.mock.calls[0] ?? [];
-    expect(url).toBe("/api/internal/workspace/cases/case-1/medication-images");
-    expect(init?.body).toBe(image);
-    expect(new Headers(init?.headers).get("Content-Type")).toBe("image/jpeg");
-    expect(new Headers(init?.headers).get("X-Filename")).toBe("medicine.jpg");
+    const [, createInit] = fetcher.mock.calls[1] ?? [];
+    expect(JSON.parse(String(createInit?.body)).caregiverPhoneE164).toBe("+966500000002");
   });
 
   it("approves exact reviewed content and receives queued delivery runs", async () => {

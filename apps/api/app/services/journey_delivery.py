@@ -5,11 +5,12 @@ from typing import Protocol
 
 import httpx
 from sqlalchemy import select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, object_session
 
 from app.config import Settings
-from app.models import CareJourney, DeliveryRun, PatientCase, utc_now
+from app.models import CareJourney, DeliveryRun, InboundMedia, PatientCase, utc_now
 from app.schemas.voice import ApprovedVoiceScript
+from app.services.medicine_photos import photo_request_text
 from app.services.object_storage import ObjectStorage
 from app.services.voice_renderer import build_voice_renderer, checksum_script
 from app.services.whatsapp_client import WhatsAppClient
@@ -30,6 +31,7 @@ class JourneyDeliveryPayload:
     phone_e164: str
     approved_by: str
     voice_script: str | None = None
+    text: str | None = None
     image_object_key: str | None = None
     image_content_type: str | None = None
 
@@ -56,6 +58,10 @@ class LiveJourneyDeliveryAdapter:
     async def deliver(self, payload: JourneyDeliveryPayload) -> str:
         if payload.kind == "follow_up_call":
             return await self._dispatch_call(payload)
+        if payload.kind == "photo_request":
+            if not payload.text:
+                raise JourneyDeliveryError("no dispensed medicine to photograph")
+            return await self._whatsapp.send_text(payload.phone_e164, payload.text)
         if not payload.voice_script:
             raise JourneyDeliveryError("approved voice script is missing")
 
@@ -80,7 +86,7 @@ class LiveJourneyDeliveryAdapter:
             return voice_message_id
 
         if not payload.image_object_key or not payload.image_content_type:
-            raise JourneyDeliveryError("approved medication image is missing")
+            return voice_message_id  # No checked box photo yet: the voice reminder goes alone.
         image = self._storage.get_bytes(payload.image_object_key)
         suffix = PurePosixPath(payload.image_object_key).suffix or ".jpg"
         image_id = await self._whatsapp.upload_image(
@@ -176,9 +182,12 @@ class JourneyDeliveryOrchestrator:
         patient: PatientCase,
     ) -> JourneyDeliveryPayload:
         script: str | None = None
+        text: str | None = None
         image_key: str | None = None
         image_type: str | None = None
-        if run.kind == "discharge_voice_note":
+        if run.kind == "photo_request":
+            text = photo_request_text(journey.medications, journey.language_code)
+        elif run.kind == "discharge_voice_note":
             script = journey.discharge_voice_note.get("script")
         elif run.kind == "medication_reminder":
             medication_id = run.content_ref.split(":", 1)[-1]
@@ -189,7 +198,7 @@ class JourneyDeliveryOrchestrator:
             if medication:
                 script = medication.get("reminderScript")
                 image = medication.get("image") or {}
-                image_key = image.get("objectKey")
+                image_key = image.get("objectKey") or _patient_photo_key(journey, medication_id)
                 image_type = _image_content_type(image_key)
         return JourneyDeliveryPayload(
             run_id=run.id,
@@ -200,6 +209,7 @@ class JourneyDeliveryOrchestrator:
             phone_e164=patient.phone_e164,
             approved_by=journey.approved_by or "",
             voice_script=script,
+            text=text,
             image_object_key=image_key,
             image_content_type=image_type,
         )
@@ -209,6 +219,28 @@ def build_journey_delivery_adapter(settings: Settings) -> JourneyDeliveryAdapter
     if settings.demo_provider_mode == "mock":
         return MockJourneyDeliveryAdapter()
     return LiveJourneyDeliveryAdapter(settings)
+
+
+def _patient_photo_key(journey: CareJourney, medication_id: str) -> str | None:
+    """The patient's own box photo for this medicine, once it matched or a person confirmed it."""
+    session = object_session(journey)
+    if session is None:
+        return None
+    photos = session.scalars(
+        select(InboundMedia)
+        .where(
+            InboundMedia.case_id == journey.case_id,
+            InboundMedia.medication_id == medication_id,
+            InboundMedia.processing_status == "stored",
+        )
+        .order_by(InboundMedia.received_at.desc(), InboundMedia.id.desc())
+    )
+    for photo in photos:
+        if photo.review_status == "confirmed" or (
+            photo.check_status == "matched" and photo.review_status != "follow_up"
+        ):
+            return photo.object_key
+    return None
 
 
 def _image_content_type(object_key: str | None) -> str | None:

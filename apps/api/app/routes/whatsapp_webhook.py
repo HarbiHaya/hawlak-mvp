@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field, ValidationError
 from app.config import SettingsDep
 from app.db import SessionDep
 from app.services.inbound_workflow import InboundPersistenceError, InboundWorkflow
+from app.services.medicine_photos import build_label_reader
 from app.services.meta_signature import verify_meta_signature
 from app.services.object_storage import ObjectStorage
 from app.services.whatsapp_client import WhatsAppClient
@@ -84,7 +85,7 @@ def get_inbound_workflow(
         settings.whatsapp_phone_number_id,
         settings.whatsapp_access_token,
     )
-    return InboundWorkflow(session, ObjectStorage(settings), whatsapp)
+    return InboundWorkflow(session, ObjectStorage(settings), whatsapp, build_label_reader(settings))
 
 
 @router.get("/webhooks/whatsapp")

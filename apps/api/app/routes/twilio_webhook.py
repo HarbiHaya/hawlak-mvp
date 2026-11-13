@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse, Response
 from app.config import SettingsDep
 from app.db import SessionDep
 from app.services.inbound_workflow import InboundPersistenceError, InboundWorkflow
+from app.services.medicine_photos import build_label_reader
 from app.services.object_storage import ObjectStorage, ObjectStorageError, StorageDep
 from app.services.twilio_media import TwilioMediaTokenError, resolve_twilio_media_token
 from app.services.twilio_signature import verify_twilio_signature
@@ -22,7 +23,9 @@ def get_twilio_inbound_workflow(
     session: SessionDep,
 ) -> InboundWorkflow:
     storage = ObjectStorage(settings)
-    return InboundWorkflow(session, storage, build_whatsapp_client(settings, storage))
+    return InboundWorkflow(
+        session, storage, build_whatsapp_client(settings, storage), build_label_reader(settings)
+    )
 
 
 @router.post("/webhooks/twilio")

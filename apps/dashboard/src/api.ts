@@ -134,6 +134,28 @@ export interface WorkspaceCaseDetail extends WorkspaceCaseSummary {
   approvedBy: string | null;
   approvedAt: string | null;
   deliveryRuns: DeliveryRun[];
+  medicinePhotos?: MedicinePhoto[];
+}
+
+export type PhotoCheckStatus =
+  | "matched"
+  | "strength_mismatch"
+  | "not_in_plan"
+  | "unreadable"
+  | "not_checked";
+
+/** A medicine-box photo sent on WhatsApp, the label text read from it, and the human review. */
+export interface MedicinePhoto {
+  id: string;
+  sender: "patient" | "caregiver";
+  receivedAt: string;
+  objectKey: string | null;
+  reading: { name: string | null; strength: string | null; form: string | null } | null;
+  checkStatus: PhotoCheckStatus;
+  medicationId: string | null;
+  reviewStatus: "confirmed" | "follow_up" | null;
+  reviewedBy: string | null;
+  reviewedAt: string | null;
 }
 
 export interface InsuranceRecord {
@@ -194,6 +216,7 @@ export interface CaregiverCase {
     medicationId: string;
     displayName: string;
     status: "scheduled" | "needs_support";
+    photoStatus?: "missing" | "received" | "needs_attention" | "confirmed";
   }>;
   openAlertCount: number;
   nextCallAt: string | null;
@@ -211,6 +234,7 @@ export interface SubmitDischargePacket {
   patientFullName: string;
   preferredAddress?: string;
   phoneE164: string;
+  caregiverPhoneE164?: string;
   memberId?: string;
   languageCode: "ar" | "en";
   dialectCode: DialectCode;
@@ -359,6 +383,7 @@ export class HawlakApi {
         patientName: packet.patientFullName,
         preferredFormOfAddress: packet.preferredAddress || null,
         phoneE164: packet.phoneE164,
+        caregiverPhoneE164: packet.caregiverPhoneE164 || null,
         memberId: packet.memberId || null,
         languageCode: packet.languageCode,
         dialectCode: packet.dialectCode,
@@ -384,6 +409,18 @@ export class HawlakApi {
 
   listWorkspaceAlerts(): Promise<{ data: WorkspaceAlert[] }> {
     return this.request("/internal/workspace/alerts");
+  }
+
+  reviewMedicinePhoto(
+    caseId: string,
+    photoId: string,
+    decision: "confirmed" | "follow_up",
+    reviewedBy: string,
+  ): Promise<MedicinePhoto> {
+    return this.request(
+      `/internal/workspace/cases/${encodeURIComponent(caseId)}/photos/${encodeURIComponent(photoId)}/review`,
+      { method: "POST", body: JSON.stringify({ decision, reviewedBy }) },
+    );
   }
 
   resolveWorkspaceAlert(alertId: string): Promise<{ id: string; status: "resolved" }> {

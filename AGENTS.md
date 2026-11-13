@@ -39,6 +39,8 @@ when you finish a milestone.
 | Drafting and the fidelity guard | `apps/api/app/services/journey_drafter.py` |
 | Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v3.txt` |
 | Patient-text identifier gate | `apps/api/app/services/patient_identifiers.py` |
+| Medicine-photo label check and fixed replies | `apps/api/app/services/medicine_photos.py` |
+| Inbound WhatsApp (patient or caregiver) | `apps/api/app/services/inbound_workflow.py` |
 | Mock insurer eligibility and enrollment | `apps/api/app/services/insurer_systems.py` |
 | Meta and call dispatch | `apps/api/app/services/journey_delivery.py` |
 | Role APIs | `apps/api/app/routes/care_journeys.py` |
@@ -59,7 +61,10 @@ pull request reviewed by both Haya and Retaj.
 - Clinical content comes only from the approved plan. Nothing reaches a patient
   until its exact script is approved.
 - Never log tokens or full phone numbers (last 4 digits only).
-- Medicine photos are stored, never interpreted.
+- Medicine photos: the vision model reads only the printed label (name, strength,
+  form). Code, not the model, compares it with the approved plan. The sender gets
+  only the fixed replies in `PHOTO_REPLIES`, never a verdict; a mismatch becomes an
+  alert for a person, who confirms or follows up.
 - `apps/api` holds no UI code. `apps/dashboard` holds no AI, WhatsApp, database
   or storage code; it only calls the API.
 - Generated drafts must pass `guard_draft`, which checks numbers, medicine names

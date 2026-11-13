@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     demo_provider_mode: Literal["mock", "live"] = "mock"
     openai_api_key: SecretStr | None = None
     openai_text_model: str = "gpt-6-astra"
+    # Reads only the printed label on medicine-box photos.
+    openai_vision_model: str = "gpt-4.1-mini"
     elevenlabs_api_key: SecretStr | None = None
     elevenlabs_voice_id: str = "replace_after_saudi_arabic_voice_test"
     elevenlabs_voice_label: str = "Configured Saudi Arabic voice"

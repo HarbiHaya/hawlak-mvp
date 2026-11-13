@@ -61,7 +61,14 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
   - `provision.sh`
   - `deploy.sh`
   - `sync_keys.sh`, which pushes provider keys from `.env` to SSM and redeploys
-- Checks: API 218 tests, dashboard 18 tests, contracts 3 tests, typecheck and build.
+- Medicine-photo check:
+  - The patient, or a caregiver registered at intake, sends box photos on WhatsApp.
+  - In live mode, a vision model reads only the printed label. Code compares it with
+    the plan: matched, strength differs, not on the plan, or unreadable.
+  - The sender gets fixed replies only (photo n of total, retake, all received).
+  - A mismatch raises an alert. The insurer reviewer confirms or marks follow-up in
+    the Medicine photos tab, and the caregiver view shows each medicine's photo state.
+- Checks: API 227 tests, dashboard 20 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 
@@ -77,7 +84,7 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
 - Reconcile Retaj's pharmacist-review dashboard (on `main` from PR #1) with this
   branch.
 - Contract review by Haya and Retaj of the new fields: `memberId`, `callPlan`
-  schedule, `insurance` and `generatedDraft`.
+  schedule, `insurance`, `generatedDraft`, `caregiverPhoneE164` and `medicinePhotos`.
 - OCR for scanned PDFs, and a real insurer integration in place of the mock.
 - Before any real data:
   - HTTPS from CloudFront to the origin.

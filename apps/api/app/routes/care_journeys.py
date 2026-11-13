@@ -14,6 +14,7 @@ from app.schemas.care_journey import (
     CareJourneyCreate,
     DeliveryRunUpdate,
     EligibilityRequest,
+    PhotoReviewRequest,
 )
 from app.services.care_journey_service import (
     DEFAULT_CALL_PLAN,
@@ -269,6 +270,18 @@ def approve_workspace_case(
         "insurance": journey["insurance"],
         "deliveryRuns": [service.run_view(run) for run in runs],
     }
+
+
+@router.post("/workspace/cases/{case_id}/photos/{photo_id}/review")
+def review_medicine_photo(
+    case_id: str, photo_id: str, body: PhotoReviewRequest, session: SessionDep
+):
+    try:
+        return CareJourneyService(session).review_photo(
+            case_id, photo_id, body.decision, body.reviewed_by
+        )
+    except JourneyNotFound:
+        return JSONResponse(status_code=404, content={"error": "photo_not_found"})
 
 
 @router.get("/workspace/alerts")

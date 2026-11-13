@@ -2,10 +2,10 @@ import { useCallback, useEffect, useState } from "react";
 
 import { displayError, type Locale } from "./App";
 import { Icon } from "./Icon";
-import type { CallPlan, CallRepeat, DischargeExtraction, GeneratedDraft, HawlakApi, InsuranceRecord, WorkspaceAlert, WorkspaceCaseDetail, WorkspaceCaseSummary, WorkspaceMedication } from "./api";
+import type { CallPlan, CallRepeat, DischargeExtraction, GeneratedDraft, HawlakApi, InsuranceRecord, PhotoCheckStatus, WorkspaceAlert, WorkspaceCaseDetail, WorkspaceCaseSummary, WorkspaceMedication } from "./api";
 
 type Section = "cases" | "alerts";
-type Tab = "source" | "coverage" | "content" | "medications" | "journey";
+type Tab = "source" | "coverage" | "content" | "medications" | "photos" | "journey";
 
 const labels = {
   ar: {
@@ -34,6 +34,9 @@ const labels = {
     policy: "رقم الوثيقة", plan: "فئة التغطية", network: "الشبكة الطبية", period: "فترة التغطية", programme: "البرنامج", programName: "برنامج الرعاية بعد الخروج", manager: "مدير الحالة", checkedAt: "تاريخ التحقق", enrollment: "رقم التسجيل في البرنامج",
     notChecked: "لم يُتحقق من أهلية العضو بعد. أدخل رقم العضوية للتحقق من التغطية قبل الاعتماد.", coverageSource: "المصدر: نظام الأعضاء لدى شركة التأمين (بيئة تجريبية).", notFoundHint: "لم يُعثر على رقم العضوية في نظام الأعضاء. يُرجى التحقق من الرقم مع المستشفى.", policyLapsed: "انتهت صلاحية الوثيقة",
     checked: "حُدّثت بيانات التغطية.", approvalRecord: "سجل الاعتماد", demoMode: "وضع العرض مفعّل: لا تُرسل رسائل واتساب ولا تُجرى مكالمات فعلياً، وإنما تُحاكى خطوات التنفيذ فقط. يتطلب الإرسال الفعلي ربط مزودي واتساب وتحويل النص إلى صوت والمكالمات.", simulated: "تمت المحاكاة — لم يُرسل فعلياً", approvedBy: "اعتمدها", approvedAt: "تاريخ الاعتماد", noRuns: "تظهر خطوات التنفيذ بعد اعتماد خطة المتابعة.",
+    photos: "صور الأدوية", noPhotos: "لم تصل صور علب أدوية من المريض أو مقدم الرعاية بعد.", photosNote: "يقرأ حولك النص المطبوع على العلبة فقط ويقارنه آلياً بالخطة المعتمدة. لا يُرسل للمريض أي حكم؛ القرار لك.",
+    sentBy: "أرسلها", fromPatient: "المريض", fromCaregiver: "مقدم الرعاية", label: "المكتوب على العلبة", planned: "الدواء في الخطة", notRead: "لم تُقرأ",
+    confirmPhoto: "تأكيد المطابقة", followUp: "يحتاج متابعة", reviewed: "راجعها {who}", reviewFailed: "تعذّر حفظ المراجعة.",
   },
   en: {
     cases: "Cases", alerts: "Alerts", title: "Discharge case review", subtitle: "Review the content prepared for each patient, verify insurance coverage, then approve the follow-up plan.", alertsSubtitle: "Alerts from active follow-up plans that require action by the care team.",
@@ -61,6 +64,9 @@ const labels = {
     policy: "Policy number", plan: "Plan", network: "Provider network", period: "Coverage period", programme: "Programme", programName: "Post-discharge care programme", manager: "Case manager", checkedAt: "Verified on", enrollment: "Programme enrolment reference",
     notChecked: "Eligibility has not been verified. Enter the member ID to verify coverage before approval.", coverageSource: "Source: insurer member system (demo environment).", notFoundHint: "The member ID was not found in the member system. Confirm the ID with the hospital.", policyLapsed: "Policy lapsed",
     checked: "Coverage information updated.", approvalRecord: "Approval record", demoMode: "Demo mode is on: no WhatsApp messages are sent and no calls are placed; delivery steps are only simulated. Real delivery requires connecting the WhatsApp, text-to-speech and calling providers.", simulated: "Simulated — not actually sent", approvedBy: "Approved by", approvedAt: "Approved on", noRuns: "Delivery steps appear once the follow-up plan is approved.",
+    photos: "Medicine photos", noPhotos: "No medicine-box photos have arrived from the patient or caregiver yet.", photosNote: "Hawlak reads only the text printed on the box and compares it with the approved plan in code. The patient is never told a verdict; the decision is yours.",
+    sentBy: "Sent by", fromPatient: "Patient", fromCaregiver: "Caregiver", label: "Printed on the box", planned: "Planned medicine", notRead: "Not read",
+    confirmPhoto: "Confirm match", followUp: "Needs follow-up", reviewed: "Reviewed by {who}", reviewFailed: "The review could not be saved.",
   },
 } as const;
 
@@ -81,6 +87,15 @@ const runStatusLabel: Record<string, { ar: string; en: string }> = {
 const alertTypeLabel: Record<string, { ar: string; en: string }> = {
   medication_access: { ar: "دواء لم يُصرف", en: "Medication not dispensed" },
   call_escalation: { ar: "تصعيد من مكالمة المتابعة", en: "Follow-up call escalation" },
+  medicine_photo_mismatch: { ar: "صورة دواء لا تطابق الخطة", en: "Medicine photo does not match the plan" },
+  medicine_photos_ready: { ar: "وصلت صور كل الأدوية", en: "All medicine photos received" },
+};
+const photoCheckLabel: Record<PhotoCheckStatus, { ar: string; en: string }> = {
+  matched: { ar: "مطابقة للخطة", en: "Matches the plan" },
+  strength_mismatch: { ar: "التركيز مختلف عن الخطة", en: "Strength differs from the plan" },
+  not_in_plan: { ar: "ليست في الخطة المعتمدة", en: "Not on the approved plan" },
+  unreadable: { ar: "الصورة غير واضحة", en: "Photo not readable" },
+  not_checked: { ar: "بانتظار مراجعتك", en: "Awaiting your check" },
 };
 const answerKindLabel: Record<string, { ar: string; en: string }> = {
   red_flag: { ar: "إجابة تشير إلى علامة خطر", en: "red-flag answer" }, uncertain: { ar: "إجابة غير واضحة", en: "unclear answer" }, transfer_request: { ar: "طلب التحدث إلى أحد أعضاء الفريق", en: "request to speak to a team member" },
@@ -162,6 +177,15 @@ export function InsurerWorkspace({ api, locale, section, reviewer }: { api: Hawl
   async function resolveAlert(alertId: string) {
     try { await api.resolveWorkspaceAlert(alertId); await loadAlerts(); void loadCases(); }
     catch (caught) { setError(displayError(caught, locale)); }
+  }
+
+  async function reviewPhoto(photoId: string, decision: "confirmed" | "follow_up") {
+    if (!detail) return;
+    try {
+      await api.reviewMedicinePhoto(detail.caseId, photoId, decision, reviewer);
+      setDetail(await api.getWorkspaceCase(detail.caseId));
+      void loadCases(detail.caseId);
+    } catch { setError(t.reviewFailed); }
   }
 
   async function chooseCase(caseId: string) {
@@ -247,7 +271,7 @@ export function InsurerWorkspace({ api, locale, section, reviewer }: { api: Hawl
   const filtered = cases.filter((item) => `${item.patientName} ${item.caseId}`.toLocaleLowerCase().includes(query.toLocaleLowerCase()));
   const tabs: Array<{ value: Tab; label: string }> = [
     { value: "source", label: t.source }, { value: "coverage", label: t.coverage }, { value: "content", label: t.content },
-    { value: "medications", label: t.medications }, { value: "journey", label: t.journey },
+    { value: "medications", label: t.medications }, { value: "photos", label: `${t.photos}${detail?.medicinePhotos?.length ? ` (${detail.medicinePhotos.length})` : ""}` }, { value: "journey", label: t.journey },
   ];
 
   return <div className="workspace workspace--wide">
@@ -259,7 +283,7 @@ export function InsurerWorkspace({ api, locale, section, reviewer }: { api: Hawl
       <section className="case-detail">{loading && !detail ? <div className="detail-loading" /> : detail && <>
         <header className="case-detail__header"><div><span>{detail.caseId}</span><h2>{detail.patientName}</h2>{detail.preferredFormOfAddress && <p>{t.preferred}: {detail.preferredFormOfAddress}</p>}</div><div className="case-detail__chips">{detail.insurance && <i className={`status status--coverage-${detail.insurance.status}`}>{coverageLabel(detail.insurance, locale)}</i>}<i className={`status status--${detail.reviewStatus}`}>{statusLabel[detail.reviewStatus][locale]}</i></div></header>
         <nav className="tabs" aria-label={t.caseDetails}>{tabs.map((item) => <button key={item.value} className={tab === item.value ? "active" : ""} onClick={() => setTab(item.value)}>{item.label}</button>)}</nav>
-        <div className="tab-panel">{(tab === "content" || tab === "medications") && <DraftBanner detail={detail} locale={locale} busy={action === "draft"} onGenerate={() => void regenerate()} />}{tab === "source" && <SourceTab api={api} detail={detail} locale={locale} />}{tab === "coverage" && <CoverageTab detail={detail} locale={locale} busy={action === "eligibility"} onCheck={(memberId) => void checkEligibility(memberId)} />}{tab === "content" && <ContentTab detail={detail} locale={locale} onChange={setDetail} />}{tab === "medications" && <MedicationsTab api={api} detail={detail} locale={locale} onUpdate={updateMedication} onUpload={uploadMedicationImage} onAdd={addMedication} onRemove={(id) => setDetail({ ...detail, medications: detail.medications.filter((item) => item.medicationId !== id) })} />}{tab === "journey" && <JourneyTab detail={detail} locale={locale} />}</div>
+        <div className="tab-panel">{(tab === "content" || tab === "medications") && <DraftBanner detail={detail} locale={locale} busy={action === "draft"} onGenerate={() => void regenerate()} />}{tab === "source" && <SourceTab api={api} detail={detail} locale={locale} />}{tab === "coverage" && <CoverageTab detail={detail} locale={locale} busy={action === "eligibility"} onCheck={(memberId) => void checkEligibility(memberId)} />}{tab === "content" && <ContentTab detail={detail} locale={locale} onChange={setDetail} />}{tab === "medications" && <MedicationsTab api={api} detail={detail} locale={locale} onUpdate={updateMedication} onUpload={uploadMedicationImage} onAdd={addMedication} onRemove={(id) => setDetail({ ...detail, medications: detail.medications.filter((item) => item.medicationId !== id) })} />}{tab === "photos" && <PhotosTab api={api} detail={detail} locale={locale} onReview={(id, decision) => void reviewPhoto(id, decision)} />}{tab === "journey" && <JourneyTab detail={detail} locale={locale} />}</div>
         <footer className="case-actions"><button className="button" disabled={!!action || detail.reviewStatus === "approved"} onClick={() => void saveContent()}>{action === "save" ? t.saving : t.save}</button><button className="button button--primary" disabled={!!action || detail.reviewStatus === "approved"} onClick={() => void approve()}>{action === "approve" ? t.approving : t.approve}</button></footer>
       </>}</section>
     </div>}
@@ -409,6 +433,26 @@ function JourneyTab({ detail, locale }: { detail: WorkspaceCaseDetail; locale: L
     {detail.deliveryMode === "mock" && <div className="notice notice--info">{t.demoMode}</div>}
     {detail.approvedAt && <dl className="coverage-grid approval-record"><div><dt>{t.approvedBy}</dt><dd><bdi>{detail.approvedBy}</bdi></dd></div><div><dt>{t.approvedAt}</dt><dd>{formatDate(detail.approvedAt, locale)}</dd></div>{detail.insurance?.enrollmentReference && <div><dt>{t.enrollment}</dt><dd><bdi>{detail.insurance.enrollmentReference}</bdi></dd></div>}</dl>}
     <ol className="journey-list">{detail.deliveryRuns.map((run) => <li key={run.id}><span /><div><b>{pick(runKindLabel, run.kind, locale)}</b><p>{run.providerRef?.startsWith("mock:") ? t.simulated : pick(runStatusLabel, run.status, locale)}</p></div><time>{formatDate(run.scheduledAt, locale)}</time></li>)}</ol>
+  </>;
+}
+
+function PhotosTab({ api, detail, locale, onReview }: { api: HawlakApi; detail: WorkspaceCaseDetail; locale: Locale; onReview: (id: string, decision: "confirmed" | "follow_up") => void }) {
+  const t = labels[locale];
+  const photos = detail.medicinePhotos ?? [];
+  if (photos.length === 0) return <div className="compact-empty">{t.noPhotos}</div>;
+  const planned = (id: string | null) => detail.medications.find((item) => item.medicationId === id)?.displayName;
+  return <>
+    <div className="notice notice--info">{t.photosNote}</div>
+    <div className="medication-grid">{photos.map((photo) => <article className="medication-editor photo-review" key={photo.id}>
+      <MedicineImage api={api} caseId={detail.caseId} objectKey={photo.objectKey ?? undefined} alt={photo.reading?.name ?? t.photos} empty={t.noImage} />
+      <dl className="photo-facts">
+        <div><dt>{t.sentBy}</dt><dd>{photo.sender === "caregiver" ? t.fromCaregiver : t.fromPatient} · {formatDate(photo.receivedAt, locale)}</dd></div>
+        <div><dt>{t.label}</dt><dd dir="auto">{photo.reading ? [photo.reading.name, photo.reading.strength, photo.reading.form].filter(Boolean).join(" · ") : t.notRead}</dd></div>
+        <div><dt>{t.planned}</dt><dd dir="auto">{planned(photo.medicationId) ?? "—"}</dd></div>
+        <div><dt>{t.status}</dt><dd><span className={`photo-state photo-state--${photo.checkStatus}`}>{photoCheckLabel[photo.checkStatus][locale]}</span></dd></div>
+      </dl>
+      <div className="medication-actions">{photo.reviewStatus ? <span className={`photo-state photo-state--${photo.reviewStatus}`}>{photo.reviewStatus === "confirmed" ? t.confirmPhoto : t.followUp} · {t.reviewed.replace("{who}", photo.reviewedBy ?? "")}</span> : <><button className="button" onClick={() => onReview(photo.id, "follow_up")}>{t.followUp}</button><button className="button button--primary" onClick={() => onReview(photo.id, "confirmed")}>{t.confirmPhoto}</button></>}</div>
+    </article>)}</div>
   </>;
 }
 

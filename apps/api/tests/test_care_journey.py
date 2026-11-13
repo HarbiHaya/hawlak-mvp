@@ -328,6 +328,7 @@ def test_caregiver_projection_excludes_phone_scripts_and_document(client, intern
             "medicationId": "SYN-MED-001",
             "displayName": "دواء تجريبي ألف",
             "status": "scheduled",
+            "photoStatus": "missing",
         }
     ]
     serialized = str(payload)

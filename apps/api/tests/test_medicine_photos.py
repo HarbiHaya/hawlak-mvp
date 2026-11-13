@@ -46,7 +46,9 @@ CALVEXA = {
 }
 
 
-def intake(caregiver: str | None = CAREGIVER, language: str = "ar") -> dict:
+def intake(
+    caregiver: str | None = CAREGIVER, language: str = "ar", medications: list | None = None
+) -> dict:
     return {
         "caseId": "case_photo_01",
         "patientName": "Synthetic Patient One",
@@ -56,7 +58,7 @@ def intake(caregiver: str | None = CAREGIVER, language: str = "ar") -> dict:
         "dialectCode": "ar-SA-najdi",
         "sourceDocument": {"objectKey": "cases/case_photo_01/media/d.pdf", "filename": "d.pdf"},
         "dischargeVoiceNote": {"enabled": False, "script": ""},
-        "medications": [ZENTORIN, CALVEXA],
+        "medications": medications or [ZENTORIN, CALVEXA],
         "callPlan": {
             "enabled": False,
             "openingScript": "",
@@ -167,6 +169,41 @@ async def test_photos_link_to_the_requested_medicine_by_slot(db_session):
         "medicine_photo_mismatch",
         "medicine_photos_ready",
     }
+
+
+@pytest.mark.anyio
+async def test_a_box_sent_out_of_order_links_to_its_own_waiting_medicine(db_session):
+    seed(db_session)
+    whatsapp = FakeWhatsApp()
+    # Asked for Zentorin first, the patient sends Calvexa first.
+    reader = FakeReader({"m1": readable("Calvexa", "500 mg"), "m2": readable("Zentorin", "5 mg")})
+    workflow = InboundWorkflow(db_session, FakeStorage(), whatsapp, reader)
+
+    await send_photo(workflow, 1)
+    await send_photo(workflow, 2)
+
+    photos = db_session.query(InboundMedia).order_by(InboundMedia.received_at).all()
+    assert [p.medication_id for p in photos] == ["SYN-MED-002", "SYN-MED-001"]
+    assert [p.check_status for p in photos] == ["matched", "matched"]
+    assert whatsapp.sent == [
+        (PATIENT, AR["next"].format(n=1, total=2, name="Zentorin 5 mg")),
+        (PATIENT, AR["complete"]),
+    ]
+    assert {a.type for a in db_session.query(Alert)} == {"medicine_photos_ready"}
+
+
+@pytest.mark.anyio
+async def test_a_box_that_fits_two_waiting_medicines_stays_on_the_requested_slot(db_session):
+    twin = {**CALVEXA, "medicationId": "SYN-MED-003"}
+    seed(db_session, medications=[ZENTORIN, CALVEXA, twin])
+    reader = FakeReader({"m1": readable("Calvexa", "500 mg")})
+    workflow = InboundWorkflow(db_session, FakeStorage(), FakeWhatsApp(), reader)
+
+    await send_photo(workflow, 1)
+
+    photo = db_session.query(InboundMedia).one()
+    assert (photo.medication_id, photo.check_status) == ("SYN-MED-001", "different_medicine")
+    assert {a.type for a in db_session.query(Alert)} == {"medicine_photo_mismatch"}
 
 
 @pytest.mark.anyio

@@ -13,6 +13,11 @@ then only asks: does this box match that one medicine?
   intake. The insurer dashboard has no image upload.
 - The link from photo to medicine is deterministic. It comes from the request
   order, never from the model.
+- A box sent out of order is the one exception. When the label fails the
+  requested medicine and code matches it to exactly one other approved medicine
+  still waiting, the photo is linked there and Hawlak asks again for the
+  missing box. No match, or more than one, keeps the requested slot and alerts
+  a person.
 - The model only reads the printed label. Code decides the result.
 - The patient never gets a verdict. A mismatch becomes an alert for a person.
 
@@ -61,7 +66,7 @@ sequenceDiagram
 |---|---|---|
 | Caregiver phone | `PatientCase.caregiver_phone_e164`, intake field `caregiverPhoneE164` | Must differ from the patient phone. Photos from any other number are ignored |
 | Photo request | Delivery run `photo_request`, created at approval when any medicine is dispensed | Text names the first approved medicine. Sent as WhatsApp text |
-| Slot linking | `InboundWorkflow._check_photo` | Slot = first dispensed medicine, in plan order, with no accepted photo. Unreadable photos keep the slot open |
+| Slot linking | `InboundWorkflow._check_photo` | Slot = first dispensed medicine, in plan order, with no accepted photo. Unreadable photos keep the slot open. A box that fails its slot but matches exactly one other waiting medicine is linked to that one |
 | Label reader | `medicine_photos.OpenAILabelReader`, prompt `medicine-label-v1.txt` | Returns name, strength, form, readable. Never names, numbers or sticker text |
 | Comparison | `medicine_photos.compare_reading(reading, medication)` | Name-word overlap with the approved display name, then strength numbers. Pure code |
 | Replies | `medicine_photos.PHOTO_REPLIES` | request, next, retake, complete, received_extra. Only approved medicine names are filled in |
@@ -107,10 +112,10 @@ OCR finds no approved name. That adds a dependency and is only worth it at volum
 - [x] Reviewer tab with confirm or follow-up
 - [x] Caregiver photo status
 - [x] Reminders use the matched or confirmed patient photo, or go voice-only
-- [x] Tests: API 231, dashboard 19; live reader checked with synthetic boxes
+- [x] Out-of-order photos link to their own waiting medicine instead of raising an alert
+- [x] Tests: API 233, dashboard 19; live reader checked with synthetic boxes
 - [ ] WhatsApp template for the photo request (needed outside the 24-hour window)
 - [ ] Recorded caregiver consent and revocation
 - [ ] Arabic-only plan names: add a Latin name or code so they can match a box
-- [ ] Out-of-order photos: today they are flagged as different_medicine for a person
 - [ ] Contract review of `caregiverPhoneE164`, `medicinePhotos` and `photo_request` by Haya and Retaj
 - [ ] Optional OCR-first path if volume makes model reads matter

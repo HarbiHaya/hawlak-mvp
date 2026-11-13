@@ -69,7 +69,7 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
     against that one medicine. Identical photos are read once.
   - Fixed replies only. A mismatch alerts the reviewer, who confirms or marks
     follow-up. Reminders then carry the patient's matched or confirmed box photo.
-- Checks: API 231 tests, dashboard 19 tests, contracts 3 tests, typecheck and build.
+- Checks: API 233 tests, dashboard 19 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 

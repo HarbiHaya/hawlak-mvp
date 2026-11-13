@@ -65,7 +65,9 @@ pull request reviewed by both Haya and Retaj.
   the insurer. Hawlak asks for each approved medicine by name, and each photo is
   linked to the medicine it was requested for (its slot), never by model guess.
   The vision model reads only the printed label; code compares it with that one
-  medicine. Senders get only the fixed replies in `PHOTO_REPLIES`, never a
+  medicine. The one exception is a box sent out of order: when the label fails
+  the requested medicine and code matches it to exactly one other approved
+  medicine still waiting for its photo, the photo is linked there instead. Senders get only the fixed replies in `PHOTO_REPLIES`, never a
   verdict; a mismatch becomes an alert for a person. Design:
   [`docs/architecture/medicine-photo-check.md`](docs/architecture/medicine-photo-check.md).
 - `apps/api` holds no UI code. `apps/dashboard` holds no AI, WhatsApp, database

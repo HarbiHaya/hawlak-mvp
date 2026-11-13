@@ -2,7 +2,8 @@
 
 Hawlak asks for the approved medicines one at a time, so each photo is linked to the
 medicine it was requested for (its slot), never by model guess. A vision model then reads
-only what is printed on the box, and code checks it against that one medicine. The sender
+only what is printed on the box, and code checks it against that one medicine (a box sent
+out of order is linked by code to the one other waiting medicine it matches). The sender
 only ever gets one of the fixed replies below; a mismatch goes to a person as an alert.
 """
 

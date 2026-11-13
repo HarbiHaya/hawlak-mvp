@@ -333,8 +333,9 @@ class InboundWorkflow:
         return event
 
     async def _check_photo(self, media, patient_case, journey, downloaded) -> None:
-        """Link the photo to the medicine Hawlak asked for, check the label against that one
-        medicine, alert a person on a mismatch, then ask for the next box with a fixed reply."""
+        """Link the photo to the medicine Hawlak asked for (or, when the box was sent out of
+        order, to the one other waiting medicine its label matches), alert a person on a
+        mismatch, then ask for the next box with a fixed reply."""
         dispensed = [m for m in journey.medications if m["dispensed"]]
         earlier = [p for p in self._case_photos(patient_case.id) if p.id != media.id]
         accepted = {p.medication_id for p in earlier if p.check_status not in (None, "unreadable")}
@@ -349,6 +350,18 @@ class InboundWorkflow:
 
         reading = await self._read_once(earlier, media, downloaded)
         status = compare_reading(reading, expected)
+        if status == "different_medicine":
+            # Sent out of order: code (not the model) finds the one other approved medicine
+            # still waiting that this label matches. None or several: keep the requested slot.
+            waiting = [
+                m
+                for m in dispensed
+                if m["medicationId"] not in accepted
+                and m is not expected
+                and compare_reading(reading, m) == "matched"
+            ]
+            if len(waiting) == 1:
+                expected, status = waiting[0], "matched"
         media.medication_id = expected["medicationId"]
         media.label_reading = reading.to_json() if reading else None
         media.check_status = status

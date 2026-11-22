@@ -159,7 +159,7 @@ def test_the_template_states_the_calculated_count_and_nothing_when_unknown():
     unknown = drafter.draft(EXTRACTION, [med("40 mg twice daily")], None, "en")
 
     count = "Number of tablets or capsules per dose: 2."
-    assert count in known.reminder_scripts["SYN-MED-001"] and count in known.voice_script
+    assert count in known.reminder_scripts["SYN-MED-001"] and count not in known.voice_script
     assert "per dose" not in unknown.reminder_scripts["SYN-MED-001"] + unknown.voice_script
 
 
@@ -171,7 +171,7 @@ class FakeModel:
     def generate(self, prompt: str, payload: dict) -> dict:
         self.payload = payload
         return {
-            "voiceScript": "Zentorin 40 mg twice daily.",
+            "voiceScript": "Your medicines come in separate messages.",
             "reminderScripts": [{"medicationId": "SYN-MED-001", "script": self.reminder}],
             "callOpening": "Hello.",
             "callQuestions": [],

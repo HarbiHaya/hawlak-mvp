@@ -592,9 +592,11 @@ def test_insurer_regenerates_drafts_from_the_corrected_medication_list(
     )
 
     assert response.status_code == 200
-    script = response.json()["dischargeVoiceNote"]["script"]
+    body = response.json()
+    script = body["dischargeVoiceNote"]["script"]
     assert script.startswith("السلام عليكم أم نورة.")
-    assert "Fictional medicine A" in script and "Fictional medicine B" not in script
+    assert "Fictional medicine A" not in script  # medicines go to reminders, not the voice note
+    assert [m["displayName"] for m in body["medications"]] == ["Fictional medicine A"]
 
 
 def test_coverage_is_checked_at_intake_and_enrollment_is_recorded_at_approval(

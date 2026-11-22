@@ -20,10 +20,11 @@ from app.services.discharge_parser import DischargeExtraction
 from app.services.dose_facts import dose_facts
 
 logger = logging.getLogger(__name__)
-PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "journey-draft-v4.txt"
+PROMPT_PATH = Path(__file__).resolve().parents[1] / "prompts" / "journey-draft-v5.txt"
 WARNING_HEADINGS = ("warning", "red flag", "علامات الخطر", "علامات التحذير")
 ARABIC_HEADINGS = {"activity": "النشاط", "diet": "الغذاء", "follow": "المتابعة"}
 _NUMBER = re.compile(r"\d+(?:\.\d+)?")
+_NAME_END = re.compile(r"[\d(,:،]")
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
 _IDENTIFYING_LABEL = re.compile(
     r"name|\bid\b|mrn|record|phone|mobile|member|policy|national|iqama|"
@@ -36,7 +37,8 @@ TEXT = {
     "en": {
         "greeting": "Hello{label}. This message from Hawlak, on behalf of your care team, "
         "summarises your discharge instructions.",
-        "medicines": "Your medicines:",
+        "medicines_elsewhere": "Your medicines come in separate messages, with a photo request "
+        "and reminders.",
         "stopped": "Stop taking: {items}.",
         "warning": "If you notice any of the following, call {number} at once: {items}.",
         "warning_no_number": "If you notice any of the following, seek urgent medical care "
@@ -57,7 +59,7 @@ TEXT = {
     "ar": {
         "greeting": "السلام عليكم{label}. هذه رسالة من حولك نيابةً عن فريق رعايتك، "
         "وتتضمن تعليمات الخروج من المستشفى.",
-        "medicines": "أدويتك:",
+        "medicines_elsewhere": "ستصلك أدويتك في رسائل منفصلة، مع طلب صور العلب والتذكيرات.",
         "stopped": "يُرجى التوقف عن تناول: {items}.",
         "warning": "إذا لاحظت أياً مما يلي فاتصل على {number} فوراً: {items}.",
         "warning_no_number": "إذا لاحظت أياً مما يلي فاطلب الرعاية الطبية العاجلة فوراً: {items}.",
@@ -113,13 +115,8 @@ class TemplateJourneyDrafter:
         others = [s for s in extraction.sections if not _is_warning(s.heading)]
         number = _emergency_number(extraction)
 
+        # The voice note carries instructions only; medicines go to reminders and photos.
         lines = [text["greeting"].format(label=greeting)]
-        if medications:
-            lines.append(text["medicines"])
-            lines += [
-                _sentence(f"{m['displayName']}: {m['doseInstruction']}") + _units(m, text)
-                for m in medications
-            ]
         if extraction.stopped_medications:
             items = text["list"].join(extraction.stopped_medications)
             lines.append(text["stopped"].format(items=items))
@@ -131,6 +128,8 @@ class TemplateJourneyDrafter:
             key = "warning" if number else "warning_no_number"
             joined = text["list"].join(_lower_first(i, language) for i in warning_items)
             lines.append(text[key].format(number=number, items=joined))
+        if medications:
+            lines.append(text["medicines_elsewhere"])
         lines.append(text["closing"])
 
         return JourneyDraft(
@@ -218,7 +217,8 @@ def _identifying(note: str) -> bool:
 
 
 def guard_draft(draft: JourneyDraft, extraction: DischargeExtraction, medications: list) -> None:
-    """Reject a draft that adds a number or drops a medicine or its dose numbers."""
+    """Reject a draft that adds a number, drops an instruction number, names a dispensed
+    medicine in the voice note, or leaves a medicine's name out of its reminder."""
     source = " ".join(
         [
             extraction.text,
@@ -232,12 +232,13 @@ def guard_draft(draft: JourneyDraft, extraction: DischargeExtraction, medication
     invented = set().union(*(_numbers(t) for t in texts)) - allowed
     if invented:
         raise DraftRejected(f"number not in the document: {sorted(invented)}")
-    script_numbers = _numbers(draft.voice_script)
+    script = draft.voice_script.casefold()
+    instruction_numbers = _numbers(" ".join(i for s in extraction.sections for i in s.items))
+    if not instruction_numbers <= _numbers(draft.voice_script):
+        raise DraftRejected("instruction number missing from the voice note")
     for medication in medications:
-        if medication["displayName"] not in draft.voice_script:
-            raise DraftRejected("medicine missing from the voice note")
-        if not _numbers(medication["doseInstruction"]) <= script_numbers:
-            raise DraftRejected("dose number missing from the voice note")
+        if _medicine_name(medication["displayName"]).casefold() in script:
+            raise DraftRejected("medicine in the voice note")
         reminder = draft.reminder_scripts.get(medication["medicationId"], "")
         if reminder and medication["displayName"] not in reminder:
             raise DraftRejected("medicine missing from its reminder")
@@ -307,6 +308,15 @@ def build_journey_drafter(settings) -> TemplateJourneyDrafter | LiveJourneyDraft
         )
         return LiveJourneyDrafter(model, settings.openai_text_model)
     return TemplateJourneyDrafter()
+
+
+def _medicine_name(display_name: str) -> str:
+    """The name part of a display name ("Renal multivitamin, one tablet" -> "Renal multivitamin").
+
+    ponytail: best effort; a transliteration ("فوروسيميد") slips through to the reviewer,
+    who approves every word.
+    """
+    return _NAME_END.split(display_name, maxsplit=1)[0].strip() or display_name
 
 
 def _units(medication: dict, text: dict) -> str:

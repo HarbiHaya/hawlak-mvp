@@ -8,6 +8,7 @@ from pydantic import BaseModel, Field, ValidationError
 
 from app.config import SettingsDep
 from app.db import SessionDep
+from app.log_ids import log_id
 from app.services.inbound_workflow import InboundPersistenceError, InboundWorkflow
 from app.services.medicine_photos import build_label_reader
 from app.services.meta_signature import verify_meta_signature
@@ -129,7 +130,7 @@ async def receive_webhook(
                 logger.info(
                     "WhatsApp inbound message accepted wa_message_id=%s sender_suffix=%s "
                     "message_type=%s media_id=%s",
-                    message.id,
+                    log_id(message.id),
                     message.sender[-4:],
                     message_type,
                     message.image.id if message.image else None,
@@ -160,12 +161,12 @@ async def receive_webhook(
                 logger.info(
                     "WhatsApp delivery status accepted wa_message_id=%s delivery_status=%s "
                     "error_code=%s error_title=%s",
-                    status.id,
+                    log_id(status.id),
                     status.status,
                     first_error.code,
                     first_error.title,
                 )
                 if status.id:
-                    workflow.apply_delivery_status(status.id, status.status)
+                    workflow.apply_delivery_status(status.id, status.status, first_error.code)
 
     return {"received": True}

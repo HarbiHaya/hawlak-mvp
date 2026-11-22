@@ -3,6 +3,8 @@ import logging
 
 import pytest
 
+from app.log_ids import log_id
+
 VERIFY_TOKEN = "test-verify-token-long-enough"
 MEDICINE_PHOTO = {
     "id": "wamid.PHOTO1",
@@ -96,13 +98,14 @@ def test_logs_an_inbound_photo_without_the_full_phone_number(client, sign, caplo
     assert response.status_code == 200
     assert "WhatsApp inbound message accepted" in caplog.text
     for expected in (
-        "wa_message_id=wamid.PHOTO1",
+        f"wa_message_id={log_id('wamid.PHOTO1')}",
         "sender_suffix=1234",
         "message_type=image",
         "media_id=MEDIA-77",
     ):
         assert expected in caplog.text
     assert "966500001234" not in caplog.text
+    assert "wamid.PHOTO1" not in caplog.text
 
 
 def test_logs_a_delivery_status(client, sign, caplog):
@@ -123,7 +126,8 @@ def test_logs_a_delivery_status(client, sign, caplog):
 
     assert response.status_code == 200
     assert "WhatsApp delivery status accepted" in caplog.text
-    assert "wa_message_id=wamid.OUT1" in caplog.text
+    assert f"wa_message_id={log_id('wamid.OUT1')}" in caplog.text
+    assert "wamid.OUT1" not in caplog.text
     assert "delivery_status=failed" in caplog.text
     assert "error_code=131026" in caplog.text
     assert "error_title=Message undeliverable" in caplog.text

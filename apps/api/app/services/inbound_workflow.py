@@ -6,10 +6,12 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.log_ids import log_id
 from app.models import (
     Alert,
     ApprovedPlan,
     CareJourney,
+    DeliveryRun,
     InboundMedia,
     MessageLog,
     PatientCase,
@@ -125,7 +127,7 @@ class InboundWorkflow:
         if patient_case is None:
             logger.info(
                 "WhatsApp inbound sender unmatched wa_message_id=%s sender_suffix=%s",
-                wa_message_id,
+                log_id(wa_message_id),
                 sender[-4:],
             )
             return True
@@ -159,18 +161,51 @@ class InboundWorkflow:
                 self.session.commit()
             logger.warning(
                 "WhatsApp inbound processing failed wa_message_id=%s error_type=%s",
-                wa_message_id,
+                log_id(wa_message_id),
                 type(exc).__name__,
             )
         return True
 
-    def apply_delivery_status(self, wa_message_id: str, status: str | None) -> None:
+    def apply_delivery_status(
+        self, wa_message_id: str, status: str | None, error_code: int | None = None
+    ) -> None:
         message = self.session.scalar(
             select(MessageLog).where(MessageLog.wa_message_id == wa_message_id)
         )
         if message is not None and message.direction == "outbound":
             message.delivery_status = status
             self.session.commit()
+        if status == "failed":
+            self._fail_delivery_run(wa_message_id, error_code)
+
+    def _fail_delivery_run(self, wa_message_id: str, error_code: int | None) -> None:
+        """Meta accepted the send but could not deliver it: the run did not reach the patient."""
+        candidates = self.session.scalars(
+            select(DeliveryRun).where(
+                DeliveryRun.status == "sent",
+                DeliveryRun.provider_ref.contains(wa_message_id),
+            )
+        )
+        # A reminder run holds two IDs ("voice,reminder"); either one failing fails the run.
+        run = next(
+            (r for r in candidates if wa_message_id in (r.provider_ref or "").split(",")), None
+        )
+        if run is None:
+            return
+        run.status = "failed"
+        run.provider_ref = f"{run.provider_ref}|meta:{error_code}"
+        key = f"{run.id}:delivery_failed"
+        if self.session.scalar(select(Alert).where(Alert.idempotency_key == key)) is None:
+            self.session.add(
+                Alert(
+                    case_id=run.case_id,
+                    type="delivery_failed",
+                    severity="medium",
+                    summary=f"WhatsApp could not deliver the {run.kind} (Meta error {error_code})",
+                    idempotency_key=key,
+                )
+            )
+        self.session.commit()
 
     async def retry_failed_message(self, wa_message_id: str) -> str:
         message = self.session.scalar(

@@ -35,6 +35,7 @@ OTHER_HEADINGS = (
 )  # fmt: skip
 
 _BULLET = re.compile(r"^(?:[-•*·▪●–—]|\(?[0-9٠-٩]{1,3}[.)\-]|[A-Za-z][.)])\s+")
+_SECTION_NUMBER = re.compile(r"^\(?([0-9٠-٩]{1,3})[.)\-]\s+")
 _MED_SEPARATOR = re.compile(r"\s*:\s*|\s+[-–—]\s+")
 _DIGIT = re.compile(r"[0-9٠-٩]")
 
@@ -99,12 +100,13 @@ def parse_discharge_text(text: str) -> DischargeExtraction:
     kind: Kind | None = None  # None until the first known heading: skips the letterhead
     section: Section | None = None
     meds: list[list[str]] = []
+    next_section: int | None = None  # set once headings are numbered ("3. Discharge Medications")
 
     for line in filter(None, lines):
-        heading_kind = _heading_kind(line, kind is not None)
+        heading_kind, heading, number = _heading_kind(line, kind is not None, next_section)
         if heading_kind is not None:
             kind = heading_kind
-            heading = line.rstrip(":：").strip()
+            next_section = number + 1 if number is not None else next_section
             if kind == "stopped":
                 result.stopped_heading = result.stopped_heading or heading
             elif kind == "other":
@@ -117,6 +119,14 @@ def parse_discharge_text(text: str) -> DischargeExtraction:
         bullet = _BULLET.match(line)
         item = line[bullet.end() :].strip() if bullet else line
         if kind == "medications":
+            # ponytail: a long unmarked line ending in ":" or a new sentence after a finished one
+            # is prose, not a medicine; layout-aware parsing would tell them apart properly.
+            if not bullet and (
+                (item.endswith(":") and len(item.split()) >= 5)
+                or (meds and meds[-1][-1].endswith(".") and not _MED_SEPARATOR.search(item))
+            ):
+                result.notes.append(item)
+                continue
             # A wrapped line ("with food") has no marker, separator or dose number.
             if bullet or _MED_SEPARATOR.search(item) or _DIGIT.search(item) or not meds:
                 meds.append(_MED_SEPARATOR.split(item, maxsplit=1))
@@ -163,22 +173,43 @@ def draft_medications(extraction: DischargeExtraction) -> list[dict]:
     ]
 
 
-def _heading_kind(line: str, started: bool) -> Kind | None:
+def _heading_kind(
+    line: str, started: bool, next_section: int | None
+) -> tuple[Kind | None, str, int | None]:
+    """Return the section kind, its heading text and its number when the heading is numbered."""
+    numbered = _SECTION_NUMBER.match(line)
+    if numbered:
+        # A numbered line is a heading only when it is exactly a known heading, or carries the
+        # next section number with a short title; otherwise it is a numbered list item.
+        number, title = int(numbered.group(1)), line[numbered.end() :].rstrip(":：").strip()
+        kind = _known_kind(title, exact=True)
+        if kind is None and number == next_section and len(title) <= 60:
+            # ponytail: a dose-less item numbered like the next section ("4. Medicine D") reads
+            # as a heading; numbered medicines almost always carry a dose or a separator.
+            if not _DIGIT.search(title) and ":" not in title:
+                kind = "other"
+        return (kind, title, number) if kind else (None, "", None)
     if _BULLET.match(line) or len(line) > 80:
-        return None
-    key = line.rstrip(":：").strip().lower()
+        return None, "", None
+    heading = line.rstrip(":：").strip()
+    kind = _known_kind(heading, exact=False)
+    letters = [char for char in line if char.isalpha()]
+    # After the first known heading, a short ALL-CAPS line opens a new section.
+    if kind is None and started and len(letters) >= 3 and ":" not in line and line == line.upper():
+        if all("A" <= char <= "Z" for char in letters):
+            kind = "other"
+    return kind, heading, None
+
+
+def _known_kind(heading: str, exact: bool) -> Kind | None:
+    key = heading.lower()
     for kind, phrases in (
         ("stopped", STOPPED_HEADINGS),
         ("medications", MEDICATION_HEADINGS),
         ("other", OTHER_HEADINGS),
     ):
-        if any(key == phrase or key.startswith(f"{phrase} ") for phrase in phrases):
+        if any(key == phrase or (not exact and key.startswith(f"{phrase} ")) for phrase in phrases):
             return kind  # type: ignore[return-value]
-    letters = [char for char in line if char.isalpha()]
-    # After the first known heading, a short ALL-CAPS line opens a new section.
-    if started and len(letters) >= 3 and ":" not in line and line == line.upper():
-        if all("A" <= char <= "Z" for char in letters):
-            return "other"
     return None
 
 

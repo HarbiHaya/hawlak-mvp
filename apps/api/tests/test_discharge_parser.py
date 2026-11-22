@@ -76,6 +76,59 @@ def test_reads_arabic_headings_numbering_and_wrapped_lines():
     ]
 
 
+def test_reads_numbered_section_headings():
+    text = "\n".join(
+        [
+            "Discharge Summary",
+            "1. Reason for Admission",
+            "Shortness of breath.",
+            "3. Discharge Medications",
+            "The following are example adult medications and doses, to be continued:",
+            "• Fictional medicine A 40 mg orally twice daily: For fluid.",
+            "• Fictional medicine B, one tablet orally once daily: If prescribed.",
+            "Other medications, such as fictional medicine C, may be required.",
+            "4. Hemodialysis Plan",
+            "• Continue hemodialysis 3 times per week.",
+            "5. Red Flags",
+            "• Chest pain.",
+        ]
+    )
+
+    result = parse_discharge_text(text)
+
+    assert [(m.name, m.instruction) for m in result.medications] == [
+        ("Fictional medicine A 40 mg orally twice daily", "For fluid."),
+        ("Fictional medicine B, one tablet orally once daily", "If prescribed."),
+    ]
+    assert [(s.heading, s.items) for s in result.sections] == [
+        ("Hemodialysis Plan", ["Continue hemodialysis 3 times per week."]),
+        ("Red Flags", ["Chest pain."]),
+    ]
+    assert result.notes == [
+        "The following are example adult medications and doses, to be continued:",
+        "Other medications, such as fictional medicine C, may be required.",
+    ]
+
+
+def test_numbered_medicines_inside_a_numbered_section_stay_medicines():
+    text = "\n".join(
+        [
+            "٢. الأدوية",
+            "١. دواء تجريبي ألف: قرص واحد صباحاً",
+            "٢. إيقاف دواء تجريبي باء",
+            "٣. علامات الخطر",
+            "- ألم جديد في الصدر",
+        ]
+    )
+
+    result = parse_discharge_text(text)
+
+    assert [m.name for m in result.medications] == ["دواء تجريبي ألف", "إيقاف دواء تجريبي باء"]
+    assert [(s.heading, s.items) for s in result.sections] == [
+        ("علامات الخطر", ["ألم جديد في الصدر"])
+    ]
+
+
 def test_medications_become_editable_draft_rows(fixtures_dir):
     result = parse_discharge_pdf((fixtures_dir / "approved-plan.abu-mohammed.pdf").read_bytes())
 

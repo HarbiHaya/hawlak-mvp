@@ -27,6 +27,7 @@ from app.services.insurer_systems import MockInsurerSystems
 from app.services.medicine_photos import MISMATCH
 from app.services.patient_identifiers import find_identifier
 
+OPENER_RESEND = timedelta(hours=4)
 REPEAT_DAYS = {"none": 0, "daily": 1, "every_2_days": 2, "weekly": 7}
 
 
@@ -230,7 +231,9 @@ class CareJourneyService:
         self.session.commit()
         return journey
 
-    def approve(self, case_id: str, approved_by: str, idempotency_key: str) -> list[DeliveryRun]:
+    def approve(
+        self, case_id: str, approved_by: str, idempotency_key: str, opener: bool = False
+    ) -> list[DeliveryRun]:
         journey, patient = self._get(case_id)
         if journey.review_status == "approved":
             if journey.approval_idempotency_key != idempotency_key:
@@ -263,6 +266,12 @@ class CareJourneyService:
             "enrolledAt": approved_at.isoformat(),
         }
         runs: list[DeliveryRun] = []
+        if opener:
+            # The patient taps the opener's button, which opens WhatsApp's 24-hour window.
+            runs.append(self._run(case_id, "whatsapp_opener", "opener", approved_at))
+            runs.append(
+                self._run(case_id, "whatsapp_opener", "opener:2", approved_at + OPENER_RESEND)
+            )
         if journey.discharge_voice_note["enabled"]:
             runs.append(
                 self._run(case_id, "discharge_voice_note", "dischargeVoiceNote", approved_at)

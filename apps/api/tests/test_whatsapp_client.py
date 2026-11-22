@@ -275,3 +275,14 @@ async def test_download_image_converts_timeouts_to_retryable_errors():
 
     with pytest.raises(MetaMediaRetryableError):
         await media_client(handler).download_image("media-1")
+
+
+async def test_a_template_without_values_sends_no_body_component(fake_meta):
+    whatsapp, seen = fake_meta(httpx.Response(200, json={"messages": [{"id": "wamid.o"}]}))
+
+    await whatsapp.send_template(RECIPIENT, "hawlak_opener", "ar", [])
+
+    assert json.loads(seen[0].content)["template"] == {
+        "name": "hawlak_opener",
+        "language": {"code": "ar"},
+    }

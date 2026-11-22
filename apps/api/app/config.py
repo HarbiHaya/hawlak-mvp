@@ -20,6 +20,11 @@ class Settings(BaseSettings):
     # Name of the Meta-approved template for the medicine-photo request. Unset: plain text,
     # which Meta delivers only within 24 hours of the patient's last message.
     whatsapp_photo_request_template: str | None = Field(default=None, min_length=1)
+    # Meta-approved template with a quick-reply button, sent at approval to open the 24-hour
+    # window. Set: the voice note and other free-form messages wait until the patient writes.
+    whatsapp_opener_template: str | None = Field(default=None, min_length=1)
+    # Meta-approved template carrying the approved reminder script, used when the window is shut.
+    whatsapp_reminder_template: str | None = Field(default=None, min_length=1)
 
     # Local-demo access boundary. Replace this token scheme before non-local deployment.
     internal_api_token: SecretStr = Field(min_length=24)

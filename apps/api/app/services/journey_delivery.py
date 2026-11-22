@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import PurePosixPath
 from typing import Protocol
 
@@ -8,7 +8,15 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, object_session
 
 from app.config import Settings
-from app.models import CareJourney, DeliveryRun, InboundMedia, PatientCase, utc_now
+from app.models import (
+    Alert,
+    CareJourney,
+    DeliveryRun,
+    InboundMedia,
+    MessageLog,
+    PatientCase,
+    utc_now,
+)
 from app.schemas.voice import ApprovedVoiceScript
 from app.services.dose_facts import reminder_medication_id
 from app.services.medicine_photos import photo_request_text, photo_request_values
@@ -37,13 +45,36 @@ class JourneyDeliveryPayload:
     language: str = "ar"
     image_object_key: str | None = None
     image_content_type: str | None = None
+    window_open: bool = True
+
+
+# Free-form kinds that Meta delivers only inside the 24-hour window. With an opener on the case
+# they wait for the patient to write, unless the adapter sends that kind as a template.
+HELD_KINDS = frozenset({"discharge_voice_note", "photo_request", "medication_reminder"})
+WINDOW = timedelta(hours=24)
+
+
+def window_open(session: Session, case_id: str, now: datetime) -> bool:
+    """Meta's window is per recipient: only the patient's own message opens it."""
+    recent = session.scalars(
+        select(MessageLog).where(
+            MessageLog.case_id == case_id,
+            MessageLog.direction == "inbound",
+            MessageLog.created_at >= now - WINDOW,
+        )
+    )
+    return any((m.normalized_payload or {}).get("senderRole") == "patient" for m in recent)
 
 
 class JourneyDeliveryAdapter(Protocol):
+    template_kinds: frozenset[str]
+
     async def deliver(self, payload: JourneyDeliveryPayload) -> str: ...
 
 
 class MockJourneyDeliveryAdapter:
+    template_kinds: frozenset[str] = frozenset()
+
     async def deliver(self, payload: JourneyDeliveryPayload) -> str:
         return f"mock:{payload.kind}:{payload.run_id}"
 
@@ -57,10 +88,32 @@ class LiveJourneyDeliveryAdapter:
             raise JourneyDeliveryError("journey delivery requires the configured Meta provider")
         self._whatsapp = client
         self._renderer = build_voice_renderer(settings)
+        self.template_kinds = frozenset(
+            kind
+            for kind, name in (
+                ("photo_request", settings.whatsapp_photo_request_template),
+                ("medication_reminder", settings.whatsapp_reminder_template),
+            )
+            if name
+        )
 
     async def deliver(self, payload: JourneyDeliveryPayload) -> str:
         if payload.kind == "follow_up_call":
             return await self._dispatch_call(payload)
+        if payload.kind == "whatsapp_opener":
+            template = self._settings.whatsapp_opener_template
+            if not template:
+                raise JourneyDeliveryError("opener template is not configured")
+            return await self._whatsapp.send_template(
+                payload.phone_e164, template, payload.language, []
+            )
+        reminder_template = self._settings.whatsapp_reminder_template
+        if payload.kind == "medication_reminder" and not payload.window_open and reminder_template:
+            if not payload.voice_script:
+                raise JourneyDeliveryError("approved reminder script is missing")
+            return await self._whatsapp.send_template(
+                payload.phone_e164, reminder_template, payload.language, [payload.voice_script]
+            )
         if payload.kind == "photo_request":
             if not payload.text:
                 raise JourneyDeliveryError("no dispensed medicine to photograph")
@@ -167,28 +220,59 @@ class JourneyDeliveryOrchestrator:
                 .order_by(DeliveryRun.created_at, DeliveryRun.id)
             ).all()
         )
+        now = utc_now()
+        is_open = window_open(self._session, case_id, now)
+        openers = [r for r in runs if r.kind == "whatsapp_opener"]
+        template_kinds = getattr(self._adapter, "template_kinds", frozenset())
+        held = False
         for run in runs:
             if run.status in {"sent", "completed", "transferred"}:
                 continue
             if run.status == "failed":
                 continue
+            if run.kind == "whatsapp_opener" and is_open:
+                run.status = "completed"  # the patient already wrote; no need to knock again
+                self._session.commit()
+                continue
+            if openers and not is_open and run.kind in HELD_KINDS - template_kinds:
+                held = True
+                continue
             if run.status == "pending":
                 run.status = "claimed"
                 self._session.commit()
             try:
-                run.provider_ref = await self._adapter.deliver(self._payload(run, journey, patient))
+                run.provider_ref = await self._adapter.deliver(
+                    self._payload(run, journey, patient, is_open)
+                )
                 run.status = "sent"
             except Exception as exc:
                 run.status = "failed"
                 run.provider_ref = type(exc).__name__
             self._session.commit()
+        if held and min(_aware(r.scheduled_at) for r in openers) <= now - WINDOW:
+            self._alert_not_reached(case_id)
         return runs
+
+    def _alert_not_reached(self, case_id: str) -> None:
+        key = f"{case_id}:patient_not_reached"
+        if self._session.scalar(select(Alert).where(Alert.idempotency_key == key)) is None:
+            self._session.add(
+                Alert(
+                    case_id=case_id,
+                    type="patient_not_reached",
+                    severity="high",
+                    summary="The patient has not opened WhatsApp in 24 hours; phone them",
+                    idempotency_key=key,
+                )
+            )
+            self._session.commit()
 
     @staticmethod
     def _payload(
         run: DeliveryRun,
         journey: CareJourney,
         patient: PatientCase,
+        is_open: bool = True,
     ) -> JourneyDeliveryPayload:
         script: str | None = None
         text: str | None = None
@@ -225,6 +309,7 @@ class JourneyDeliveryOrchestrator:
             language=journey.language_code,
             image_object_key=image_key,
             image_content_type=image_type,
+            window_open=is_open,
         )
 
 
@@ -265,3 +350,7 @@ def _image_content_type(object_key: str | None) -> str | None:
         ".heic": "image/heic",
         ".heif": "image/heif",
     }.get(PurePosixPath(object_key).suffix.lower(), "image/jpeg")
+
+
+def _aware(moment: datetime) -> datetime:
+    return moment if moment.tzinfo else moment.replace(tzinfo=UTC)

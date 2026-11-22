@@ -73,13 +73,11 @@ class WhatsAppClient:
 
     async def send_template(self, to: str, name: str, language: str, values: list[str]) -> str:
         """An approved template is the only message Meta delivers outside the 24-hour window."""
-        template = {
-            "name": name,
-            "language": {"code": language},
-            "components": [
+        template: dict = {"name": name, "language": {"code": language}}
+        if values:  # a template with no variables takes no body component
+            template["components"] = [
                 {"type": "body", "parameters": [{"type": "text", "text": v} for v in values]}
-            ],
-        }
+            ]
         body = await self._post("messages", json=_message(to, "template", template))
         return _message_id(body)
 

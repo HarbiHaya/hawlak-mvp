@@ -228,11 +228,13 @@ def approve_workspace_case(
     case_id: str,
     body: ApprovalRequest,
     session: SessionDep,
+    settings: SettingsDep,
     idempotency_key: Annotated[str, Header(alias="Idempotency-Key", min_length=1)],
 ):
     service = CareJourneyService(session)
+    opener = settings.whatsapp_opener_template is not None
     try:
-        runs = service.approve(case_id, body.approved_by, idempotency_key)
+        runs = service.approve(case_id, body.approved_by, idempotency_key, opener=opener)
         journey = service.detail(case_id)
     except (JourneyNotFound, JourneyConflict) as exc:
         return error_response(exc)

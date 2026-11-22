@@ -519,10 +519,16 @@ class LiveFakes:
         return "wamid.question"
 
 
-def live_adapter(fakes, template: str | None = None) -> LiveJourneyDeliveryAdapter:
+def live_adapter(
+    fakes, template: str | None = None, opener: str | None = None, reminder: str | None = None
+) -> LiveJourneyDeliveryAdapter:
     adapter = object.__new__(LiveJourneyDeliveryAdapter)
     adapter._whatsapp = adapter._renderer = fakes
-    adapter._settings = SimpleNamespace(whatsapp_photo_request_template=template)
+    adapter._settings = SimpleNamespace(
+        whatsapp_photo_request_template=template,
+        whatsapp_opener_template=opener,
+        whatsapp_reminder_template=reminder,
+    )
     return adapter
 
 
@@ -582,3 +588,30 @@ async def test_the_discharge_voice_note_asks_no_dose_question():
     ref = await live_adapter(fakes).deliver(payload("discharge_voice_note", voice_script="Hello"))
     assert ref == "wamid.audio"
     assert fakes.calls == [("audio", PATIENT)]
+
+
+@pytest.mark.anyio
+async def test_the_opener_goes_as_its_template_with_no_values():
+    fakes = LiveFakes()
+    ref = await live_adapter(fakes, opener="hawlak_opener").deliver(
+        payload("whatsapp_opener", language="ar", window_open=False)
+    )
+    assert ref == "wamid.template"
+    assert fakes.calls == [("template", PATIENT, "hawlak_opener", "ar", [])]
+
+
+@pytest.mark.anyio
+async def test_a_reminder_outside_the_window_goes_as_the_reminder_template():
+    fakes = LiveFakes()
+    reminder = payload("medication_reminder", voice_script="Dose", language="en", window_open=False)
+    ref = await live_adapter(fakes, reminder="hawlak_reminder").deliver(reminder)
+    assert ref == "wamid.template"
+    assert fakes.calls == [("template", PATIENT, "hawlak_reminder", "en", ["Dose"])]
+
+
+@pytest.mark.anyio
+async def test_a_reminder_inside_the_window_stays_audio_even_with_a_template():
+    fakes = LiveFakes()
+    reminder = payload("medication_reminder", voice_script="Dose", language="en")
+    ref = await live_adapter(fakes, reminder="hawlak_reminder").deliver(reminder)
+    assert ref == "wamid.audio,wamid.question"

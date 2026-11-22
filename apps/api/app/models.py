@@ -97,7 +97,7 @@ class DeliveryRun(Base):
         UniqueConstraint("idempotency_key", name="uq_delivery_runs_idempotency_key"),
         CheckConstraint(
             "kind IN ('discharge_voice_note', 'medication_reminder', 'follow_up_call', "
-            "'photo_request')",
+            "'photo_request', 'whatsapp_opener')",
             name="ck_delivery_runs_kind",
         ),
         CheckConstraint(

@@ -98,21 +98,27 @@ class CallOutcomeClient:
             },
         )
 
-    async def _record(self, run_id: str, payload: dict[str, Any]) -> None:
-        if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{2,127}", run_id):
-            raise ValueError("invalid delivery run id")
-        await asyncio.to_thread(self._send, run_id, payload)
+    async def record_turns(self, run_id: str, turns: list[dict[str, Any]]) -> None:
+        """Store what was said, for the care team; the API deduplicates by turn number."""
+        _check_run_id(run_id)
+        await asyncio.to_thread(
+            self._send, run_id, "call-turns", {"turns": turns}, f"call-turns:{run_id}"
+        )
 
-    def _send(self, run_id: str, payload: dict[str, Any]) -> None:
-        status = payload["status"]
+    async def _record(self, run_id: str, payload: dict[str, Any]) -> None:
+        _check_run_id(run_id)
+        key = f"call-outcome:{run_id}:{payload['status']}"
+        await asyncio.to_thread(self._send, run_id, "call-outcome", payload, key)
+
+    def _send(self, run_id: str, path: str, payload: dict[str, Any], key: str) -> None:
         request = Request(
-            f"{self._base_url}/internal/delivery-runs/{run_id}/call-outcome",
-            data=json.dumps(payload, separators=(",", ":")).encode(),
+            f"{self._base_url}/internal/delivery-runs/{run_id}/{path}",
+            data=json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode(),
             headers={
                 "Accept": "application/json",
                 "Authorization": f"Bearer {self._token}",
                 "Content-Type": "application/json",
-                "Idempotency-Key": f"call-outcome:{run_id}:{status}",
+                "Idempotency-Key": key,
             },
             method="POST",
         )
@@ -130,3 +136,8 @@ class CallOutcomeClient:
             if attempt + 1 < self._max_attempts:
                 time.sleep(self._retry_delay_seconds)
         raise CallOutcomeReportError("call outcome could not be recorded") from last_error
+
+
+def _check_run_id(run_id: str) -> None:
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_-]{2,127}", run_id):
+        raise ValueError("invalid delivery run id")

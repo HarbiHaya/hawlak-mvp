@@ -362,3 +362,84 @@ def db_session_status(client, internal_auth_headers, run_id: str) -> str:
         "/internal/workspace/cases/case_call_outcome", headers=internal_auth_headers
     )
     return next(run["status"] for run in response.json()["deliveryRuns"] if run["id"] == run_id)
+
+
+TURNS = {
+    "turns": [
+        {"seq": 1, "speaker": "agent", "text": "سأسألك الآن الأسئلة المعتمدة.", "guard": "ok"},
+        {"seq": 2, "speaker": "patient", "text": "تفضل", "answerKind": "clear"},
+    ]
+}
+
+
+def call_run_id(client, internal_auth_headers, case_id="case_call_turns") -> str:
+    runs = approved_runs(client, internal_auth_headers, case_id)
+    return next(run["id"] for run in runs if run["kind"] == "follow_up_call")
+
+
+def test_call_turns_round_trip_for_the_care_team(client, internal_auth_headers):
+    run_id = call_run_id(client, internal_auth_headers)
+
+    posted = client.post(
+        f"/internal/delivery-runs/{run_id}/call-turns",
+        json=TURNS,
+        headers={**internal_auth_headers, "Idempotency-Key": f"turns-{run_id}"},
+    )
+    read = client.get(
+        f"/internal/workspace/cases/case_call_turns/calls/{run_id}/turns",
+        headers=internal_auth_headers,
+    )
+
+    assert posted.status_code == 202
+    assert [(t["seq"], t["speaker"], t["text"]) for t in read.json()["data"]] == [
+        (1, "agent", "سأسألك الآن الأسئلة المعتمدة."),
+        (2, "patient", "تفضل"),
+    ]
+    assert read.json()["data"][1]["answerKind"] == "clear"
+
+
+def test_reposting_call_turns_adds_nothing(client, internal_auth_headers):
+    run_id = call_run_id(client, internal_auth_headers)
+    headers = {**internal_auth_headers, "Idempotency-Key": f"turns-{run_id}"}
+
+    for _ in range(2):
+        client.post(f"/internal/delivery-runs/{run_id}/call-turns", json=TURNS, headers=headers)
+
+    read = client.get(
+        f"/internal/workspace/cases/case_call_turns/calls/{run_id}/turns",
+        headers=internal_auth_headers,
+    )
+    assert len(read.json()["data"]) == 2
+
+
+def test_call_turns_only_attach_to_a_call_run(client, internal_auth_headers):
+    runs = approved_runs(client, internal_auth_headers, "case_call_turns")
+    voice_run = next(run["id"] for run in runs if run["kind"] == "discharge_voice_note")
+
+    response = client.post(
+        f"/internal/delivery-runs/{voice_run}/call-turns",
+        json=TURNS,
+        headers={**internal_auth_headers, "Idempotency-Key": "turns-voice"},
+    )
+
+    assert response.status_code == 409
+
+
+def test_call_turn_text_stays_out_of_logs_and_the_caregiver_view(
+    client, internal_auth_headers, caplog
+):
+    import logging
+
+    run_id = call_run_id(client, internal_auth_headers)
+    with caplog.at_level(logging.DEBUG):
+        client.post(
+            f"/internal/delivery-runs/{run_id}/call-turns",
+            json=TURNS,
+            headers={**internal_auth_headers, "Idempotency-Key": f"turns-{run_id}"},
+        )
+    caregiver = client.get(
+        "/internal/caregiver/cases/case_call_turns", headers=internal_auth_headers
+    )
+
+    assert "تفضل" not in caplog.text
+    assert "تفضل" not in caregiver.text

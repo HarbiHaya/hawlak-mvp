@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.models import (
     Alert,
+    CallTurn,
     CareJourney,
     DeliveryRun,
     InboundMedia,
@@ -412,6 +413,38 @@ class CareJourneyService:
         run.provider_ref = provider_ref
         self.session.commit()
         return run
+
+    def record_call_turns(self, run_id: str, turns: list[dict]) -> None:
+        run = self.session.get(DeliveryRun, run_id)
+        if run is None:
+            raise JourneyNotFound(run_id)
+        if run.kind != "follow_up_call":
+            raise JourneyConflict("delivery_run_is_not_call")
+        stored = set(self.session.scalars(select(CallTurn.seq).where(CallTurn.run_id == run_id)))
+        for turn in turns:
+            if turn["seq"] not in stored:
+                self.session.add(CallTurn(run_id=run_id, **turn))
+                stored.add(turn["seq"])
+        self.session.commit()
+
+    def call_turns(self, case_id: str, run_id: str) -> list[dict]:
+        run = self.session.get(DeliveryRun, run_id)
+        if run is None or run.case_id != case_id:
+            raise JourneyNotFound(run_id)
+        rows = self.session.scalars(
+            select(CallTurn).where(CallTurn.run_id == run_id).order_by(CallTurn.seq)
+        )
+        return [
+            {
+                "seq": row.seq,
+                "speaker": row.speaker,
+                "text": row.text,
+                "answerKind": row.answer_kind,
+                "guard": row.guard,
+                "createdAt": row.created_at.isoformat(),
+            }
+            for row in rows
+        ]
 
     def record_call_outcome(
         self,

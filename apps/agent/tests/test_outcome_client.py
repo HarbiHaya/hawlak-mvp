@@ -186,3 +186,30 @@ def test_client_rejects_clear_answer_as_transfer_outcome() -> None:
                 answer_kind=AnswerKind.CLEAR,
             )
         )
+
+
+def test_client_posts_call_turns_with_one_idempotency_key_per_call() -> None:
+    captured = {}
+
+    def open_request(request, timeout):
+        captured.update(
+            {
+                "url": request.full_url,
+                "idempotency_key": request.headers["Idempotency-key"],
+                "body": json.loads(request.data),
+            }
+        )
+        return FakeResponse()
+
+    client = CallOutcomeClient(
+        "https://hawlak.example", "internal-token-long-enough", opener=open_request
+    )
+    turns = [{"seq": 1, "speaker": "agent", "text": "Hello", "guard": "ok"}]
+
+    asyncio.run(client.record_turns("run_call_01", turns))
+
+    assert captured == {
+        "url": "https://hawlak.example/internal/delivery-runs/run_call_01/call-turns",
+        "idempotency_key": "call-turns:run_call_01",
+        "body": {"turns": turns},
+    }

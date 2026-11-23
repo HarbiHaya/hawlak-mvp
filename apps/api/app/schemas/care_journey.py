@@ -146,6 +146,18 @@ class CallOutcomeRequest(CamelModel):
         return self
 
 
+class CallTurnIn(CamelModel):
+    seq: int = Field(ge=1, le=1000)
+    speaker: Literal["agent", "patient"]
+    text: str = Field(max_length=2000)
+    answer_kind: str | None = Field(default=None, max_length=32)
+    guard: Literal["ok", "replaced"] | None = None
+
+
+class CallTurnsRequest(CamelModel):
+    turns: list[CallTurnIn] = Field(max_length=400)
+
+
 class CallPlanView(CamelModel):
     id: str
     case_id: str

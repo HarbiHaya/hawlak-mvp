@@ -24,6 +24,7 @@ def test_initial_migration_upgrades_and_downgrades_sqlite(tmp_path):
         "inbound_media",
         "workflow_events",
         "review_outcomes",
+        "call_turns",
     }
 
     with engine.begin() as connection:

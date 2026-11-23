@@ -123,6 +123,27 @@ class DeliveryRun(Base):
     )
 
 
+class CallTurn(Base):
+    """One spoken turn of a follow-up call, kept with the case for the care team only."""
+
+    __tablename__ = "call_turns"
+    __table_args__ = (
+        UniqueConstraint("run_id", "seq", name="uq_call_turns_run_seq"),
+        CheckConstraint("speaker IN ('agent', 'patient')", name="ck_call_turns_speaker"),
+    )
+
+    id: Mapped[str] = mapped_column(String(128), primary_key=True, default=new_id)
+    run_id: Mapped[str] = mapped_column(
+        ForeignKey("delivery_runs.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    seq: Mapped[int] = mapped_column(Integer)
+    speaker: Mapped[str] = mapped_column(String(16))
+    text: Mapped[str] = mapped_column(Text)
+    answer_kind: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    guard: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 class Alert(Base):
     __tablename__ = "alerts"
     __table_args__ = (

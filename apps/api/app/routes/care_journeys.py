@@ -10,6 +10,7 @@ from app.models import CareJourney
 from app.schemas.care_journey import (
     ApprovalRequest,
     CallOutcomeRequest,
+    CallTurnsRequest,
     CareJourneyContent,
     CareJourneyCreate,
     DeliveryRunUpdate,
@@ -376,3 +377,27 @@ def record_call_outcome(
     except (JourneyNotFound, JourneyConflict) as exc:
         return error_response(exc)
     return service.run_view(run)
+
+
+@router.post("/delivery-runs/{run_id}/call-turns", status_code=202)
+def record_call_turns(
+    run_id: str,
+    body: CallTurnsRequest,
+    session: SessionDep,
+    _: Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=256)],
+):
+    """The call agent stores what was said; turns are deduplicated by their sequence number."""
+    turns = [turn.model_dump() for turn in body.turns]
+    try:
+        CareJourneyService(session).record_call_turns(run_id, turns)
+    except (JourneyNotFound, JourneyConflict) as exc:
+        return error_response(exc)
+    return {"accepted": len(turns)}
+
+
+@router.get("/workspace/cases/{case_id}/calls/{run_id}/turns")
+def call_turns(case_id: str, run_id: str, session: SessionDep):
+    try:
+        return {"data": CareJourneyService(session).call_turns(case_id, run_id)}
+    except (JourneyNotFound, JourneyConflict) as exc:
+        return error_response(exc)

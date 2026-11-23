@@ -33,7 +33,7 @@ One bilingual (Arabic/English) web app with role-scoped demo login:
    "Simulated — not actually sent".
 5. **Caregiver** sees adherence state, the next call and open escalations only.
 
-Drafting uses a template, or OpenAI with prompt `journey-draft-v2` when live keys
+Drafting uses a template, or OpenAI with prompt `journey-draft-v5` when live keys
 are set. Every OpenAI draft passes a fidelity guard: the same numbers as the
 source, exact medicine names, and every dose in the script. A draft that fails
 falls back to the template.
@@ -105,7 +105,19 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
   the last 7, 30 or 90 days. Counts, rates and times only; no name, phone number or
   case reference.
 - Hospital "Submitted cases" list: each registered case with its review status.
-- Checks: API 258 tests, agent 36 tests, dashboard 28 tests, contracts 3 tests, typecheck and build.
+- Voice note, calls and WhatsApp (22–23 November 2026,
+  [design](docs/superpowers/specs/2026-11-22-voice-note-calls-whatsapp-design.md)):
+  - The parser reads numbered section headings.
+  - The voice note carries discharge instructions only, in everyday words (prompt v5);
+    medicines go in their own reminders and the photo request.
+  - WhatsApp opener template; free-form messages wait for the patient's reply, and a
+    `patient_not_reached` alert opens after 24 hours. A Meta `failed` status marks the
+    run failed with an alert. Logs carry a hash of the message ID.
+  - The follow-up call talks naturally inside approved content: code picks every step,
+    a chat model phrases it, and a speech guard checks each sentence. One clarification
+    per question. Transfers dial the care team in and need them to press 1.
+  - Call transcripts are stored per call for the insurer workspace.
+- Checks: API 289 tests, agent 56 tests, dashboard 28 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 

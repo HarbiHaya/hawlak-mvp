@@ -37,7 +37,7 @@ when you finish a milestone.
 | Intake, approval and scheduling rules | `apps/api/app/services/care_journey_service.py` |
 | PDF parsing | `apps/api/app/services/discharge_parser.py` |
 | Drafting and the fidelity guard | `apps/api/app/services/journey_drafter.py` |
-| Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v4.txt` |
+| Drafting prompt (versioned) | `apps/api/app/prompts/journey-draft-v5.txt` |
 | Dose details with their source, tablet count, reminder times | `apps/api/app/services/dose_facts.py` |
 | Patient-text identifier gate | `apps/api/app/services/patient_identifiers.py` |
 | Medicine-photo label check and fixed replies | `apps/api/app/services/medicine_photos.py` |
@@ -61,7 +61,16 @@ pull request reviewed by both Haya and Retaj.
 - Synthetic patients and fictional medicines only. Never commit `.env`, real
   phone numbers, patient data or generated audio.
 - Clinical content comes only from the approved plan. Nothing reaches a patient
-  until its exact script is approved.
+  until its exact script is approved. The one exception is the follow-up call
+  agent: code picks every step, and a chat model phrases it using only the
+  approved call plan, voice note and reminder scripts. The speech guard
+  (`apps/agent/src/hawlak_agent/speech_guard.py`) replaces any sentence that has a
+  number outside that content or runs over 40 words with the approved question.
+  Opening, completion and transfer scripts are spoken word for word, and the
+  care-team transfer lines are fixed in `TRANSFER_LINES` (`transfer.py`), like
+  `PHOTO_REPLIES`.
+- The voice note carries discharge instructions only. Medicines go in their own
+  reminders and the photo request, never in the voice note.
 - Never log tokens or full phone numbers (last 4 digits only).
 - Medicine photos come only from the patient or the registered caregiver, never
   the insurer. They arrive on WhatsApp, or the caregiver uploads one in the
@@ -133,8 +142,12 @@ creates `* 2` duplicate files and folders. Never commit them. Delete them from
 - The stack stays running unless Haya asks for cleanup.
 - WhatsApp sends free-form messages only within 24 hours of the patient's last
   message. The photo request goes as a template when
-  `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names one Meta has approved; everything else
-  still needs the patient to message the business number first.
+  `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names one Meta has approved. When
+  `WHATSAPP_OPENER_TEMPLATE` is set, approval sends that opener (again after 4
+  hours), and the voice note and other free-form messages wait until the patient
+  writes back. Reminders go as `WHATSAPP_REMINDER_TEMPLATE` when it is set and
+  the window is closed. A caregiver's message does not open the patient's window.
+  After 24 hours without a reply, a `patient_not_reached` alert opens.
 
 <!-- BEGIN AWS Agent Toolkit rules -->
 # AWS Guidance for the new AWS experience

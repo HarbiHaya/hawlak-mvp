@@ -28,7 +28,7 @@ def test_next_question_directive_asks_the_approved_prompt() -> None:
         kind=CallActionKind.SPEAK, spoken_text="كيف تشعر الآن؟", question_id="general"
     )
 
-    text = directive(action, facts_plan(), "زين")
+    text = directive(action)
 
     assert "Acknowledge briefly" in text
     assert "كيف تشعر الآن؟" in text
@@ -42,7 +42,7 @@ def test_clarify_directive_limits_answers_to_approved_facts() -> None:
         answer_kind=AnswerKind.QUESTION,
     )
 
-    text = directive(action, facts_plan(), "وش تقصد؟")
+    text = directive(action)
 
     assert "only from the approved facts" in text
     assert "care team" in text

@@ -84,7 +84,7 @@ class HawlakFollowUpAgent(Agent):
         action = self.conversation.record_answer(answer)
         if action.kind in {CallActionKind.SPEAK, CallActionKind.CLARIFY}:
             # The model replies to this turn; the directive fixes what it must ask.
-            turn_ctx.add_message(role="system", content=directive(action, self._plan, patient_text))
+            turn_ctx.add_message(role="system", content=directive(action))
             return
 
         await self._say(action.spoken_text)

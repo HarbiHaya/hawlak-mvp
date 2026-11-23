@@ -199,8 +199,6 @@ def test_completed_outcome_survives_room_teardown_cancellation() -> None:
 
 
 def test_worker_classifies_the_reply_together_with_its_question() -> None:
-    from livekit.agents import StopResponse
-
     from hawlak_agent.conversation import ApprovedQuestion, CallConversation, CallPlan
 
     plan = CallPlan(
@@ -240,7 +238,6 @@ def test_worker_classifies_the_reply_together_with_its_question() -> None:
     agent.conversation.start()
     agent.conversation.next_question()
 
-    del StopResponse
     from livekit.agents import ChatContext
 
     turn_ctx = ChatContext()

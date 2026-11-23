@@ -52,12 +52,11 @@ def agent_instructions(plan: CallPlan) -> str:
     )
 
 
-def directive(action: CallAction, plan: CallPlan, patient_text: str) -> str:
-    del plan  # the facts are already in the agent instructions
-    said = f'The patient said: "{patient_text}".\n' if patient_text else ""
+def directive(action: CallAction) -> str:
+    # The patient's words stay in their own user message, never in this system note.
     if action.kind is CallActionKind.CLARIFY:
         return (
-            f"{said}Answer only from the approved facts, or say the care team will help; "
+            "Answer only from the approved facts, or say the care team will help; "
             f"never give advice. Then ask again, in these words: {action.spoken_text}"
         )
-    return f"{said}Acknowledge briefly, then ask, in these words: {action.spoken_text}"
+    return f"Acknowledge briefly, then ask, in these words: {action.spoken_text}"

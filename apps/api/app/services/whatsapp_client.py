@@ -76,7 +76,11 @@ class WhatsAppClient:
         template: dict = {"name": name, "language": {"code": language}}
         if values:  # a template with no variables takes no body component
             template["components"] = [
-                {"type": "body", "parameters": [{"type": "text", "text": v} for v in values]}
+                {
+                    "type": "body",
+                    # Meta rejects a value with a newline, a tab or 4+ spaces in a row.
+                    "parameters": [{"type": "text", "text": " ".join(v.split())} for v in values],
+                }
             ]
         body = await self._post("messages", json=_message(to, "template", template))
         return _message_id(body)

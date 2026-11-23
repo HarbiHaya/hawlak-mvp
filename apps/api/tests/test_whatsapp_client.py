@@ -286,3 +286,16 @@ async def test_a_template_without_values_sends_no_body_component(fake_meta):
         "name": "hawlak_opener",
         "language": {"code": "ar"},
     }
+
+
+@pytest.mark.anyio
+async def test_template_values_carry_no_line_breaks(fake_meta):
+    # Meta rejects a template parameter with a newline, a tab or more than four spaces in a row.
+    whatsapp, seen = fake_meta(httpx.Response(200, json={"messages": [{"id": "wamid.r"}]}))
+
+    await whatsapp.send_template(
+        RECIPIENT, "hawlak_reminder", "ar", ["خذ الدواء\nصباحاً\t     مع الأكل"]
+    )
+
+    sent = json.loads(seen[0].content)["template"]["components"][0]["parameters"][0]["text"]
+    assert sent == "خذ الدواء صباحاً مع الأكل"

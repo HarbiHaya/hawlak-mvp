@@ -4,7 +4,6 @@ import os
 from types import SimpleNamespace
 
 import pytest
-from livekit import api
 
 from hawlak_agent.conversation import AnswerKind, CallAction, CallActionKind
 
@@ -25,12 +24,15 @@ class TestAgent(HawlakFollowUpAgent):
         self._outcome_tasks = set()
         self.events = events
 
-    async def _transfer(self, transfer_to):
+    async def _transfer(self, transfer_to, question_id=None):
         self.events.append(("transfer", transfer_to))
         return True
 
     async def _end_call(self):
         self.events.append(("end", None))
+
+    async def _leave_call(self):
+        self.events.append(("leave", None))
 
 
 class FakeOutcomeClient:
@@ -75,6 +77,7 @@ def test_worker_transfers_before_reporting_structured_outcome() -> None:
             "red-flags",
             AnswerKind.RED_FLAG,
         ),
+        ("leave", None),  # the patient and the care team stay connected; no room teardown
     ]
 
 
@@ -100,7 +103,7 @@ def test_failed_transfer_reports_failed_then_safely_ends_room(transfer_raises, c
     events = []
 
     class FailedTransferAgent(TestAgent):
-        async def _transfer(self, transfer_to):
+        async def _transfer(self, transfer_to, question_id=None):
             self.events.append(("transfer", transfer_to))
             if transfer_raises:
                 raise RuntimeError("provider request +966511111111")
@@ -132,44 +135,36 @@ def test_failed_transfer_reports_failed_then_safely_ends_room(transfer_raises, c
     assert "+966511111111" not in caplog.text
 
 
-def test_livekit_transfer_requires_explicit_success_status(monkeypatch, caplog) -> None:
-    class FakeSip:
+def test_worker_transfer_dials_the_care_team_and_never_refers(monkeypatch) -> None:
+    calls = []
+
+    async def fake_warm_transfer(sip, **kwargs):
+        calls.append(kwargs)
+        return True
+
+    class FakeSipApi:
         async def transfer_sip_participant(self, request):
-            return SimpleNamespace(status=api.STS_TRANSFER_FAILED)
+            raise AssertionError("SIP REFER must not be used")
 
     context = SimpleNamespace(
-        api=SimpleNamespace(sip=FakeSip()),
-        room=SimpleNamespace(name="synthetic-room"),
+        api=SimpleNamespace(sip=FakeSipApi()), room=SimpleNamespace(name="synthetic-room")
     )
     monkeypatch.setattr(livekit_worker, "get_job_context", lambda: context)
-    agent = SimpleNamespace(participant_identity="patient-synthetic")
-
-    with caplog.at_level(logging.ERROR, logger="hawlak-call-agent"):
-        result = asyncio.run(HawlakFollowUpAgent._transfer(agent, "+966511111111"))
-
-    assert result is False
-    assert "+966511111111" not in caplog.text
-    assert "synthetic-room" not in caplog.text
-
-
-def test_livekit_transfer_exception_is_a_safe_failure(monkeypatch, caplog) -> None:
-    class FakeSip:
-        async def transfer_sip_participant(self, request):
-            raise RuntimeError("request detail +966511111111")
-
-    context = SimpleNamespace(
-        api=SimpleNamespace(sip=FakeSip()),
-        room=SimpleNamespace(name="synthetic-room"),
+    monkeypatch.setattr(livekit_worker, "warm_transfer", fake_warm_transfer)
+    agent = SimpleNamespace(
+        _plan=SimpleNamespace(
+            language="ar-SA",
+            questions=(SimpleNamespace(id="q-1"), SimpleNamespace(id="red-flags")),
+        ),
+        session=SimpleNamespace(say=None),
     )
-    monkeypatch.setattr(livekit_worker, "get_job_context", lambda: context)
-    agent = SimpleNamespace(participant_identity="patient-synthetic")
 
-    with caplog.at_level(logging.ERROR, logger="hawlak-call-agent"):
-        result = asyncio.run(HawlakFollowUpAgent._transfer(agent, "+966511111111"))
+    result = asyncio.run(HawlakFollowUpAgent._transfer(agent, "+966511111111", "red-flags"))
 
-    assert result is False
-    assert "request detail" not in caplog.text
-    assert "+966511111111" not in caplog.text
+    assert result is True
+    assert calls[0]["responder_e164"] == "+966511111111"
+    assert calls[0]["language"] == "ar"
+    assert calls[0]["question_number"] == 2
 
 
 def test_completed_outcome_survives_room_teardown_cancellation() -> None:

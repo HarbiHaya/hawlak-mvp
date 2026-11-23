@@ -25,6 +25,7 @@ from .conversation import AnswerKind, CallAction, CallActionKind, CallConversati
 from .outcome_client import CallOutcomeClient
 from .plan_client import ApprovedPlanClient
 from .settings import AgentSettings
+from .transfer import warm_transfer
 
 logger = logging.getLogger("hawlak-call-agent")
 settings = AgentSettings.from_env()
@@ -89,7 +90,7 @@ class HawlakFollowUpAgent(Agent):
         if action.kind is CallActionKind.TRANSFER:
             if action.question_id is None or action.answer_kind is None:
                 raise ValueError("transfer action is missing its escalation outcome")
-            transferred = await self._attempt_transfer(action.transfer_to)
+            transferred = await self._attempt_transfer(action.transfer_to, action.question_id)
             if transferred:
                 outcome_task = self._start_outcome_task(
                     self.outcome_client.record_transferred(
@@ -99,6 +100,7 @@ class HawlakFollowUpAgent(Agent):
                     )
                 )
                 await self._wait_for_outcome(outcome_task)
+                await self._leave_call()
                 return
             outcome_task = self._start_outcome_task(
                 self.outcome_client.record_failed(
@@ -119,9 +121,9 @@ class HawlakFollowUpAgent(Agent):
         finally:
             await self._wait_for_outcome(outcome_task)
 
-    async def _attempt_transfer(self, transfer_to: str | None) -> bool:
+    async def _attempt_transfer(self, transfer_to: str | None, question_id: str) -> bool:
         try:
-            return await self._transfer(transfer_to)
+            return await self._transfer(transfer_to, question_id)
         except Exception as exc:
             logger.error(
                 "sip transfer failed",
@@ -166,35 +168,65 @@ class HawlakFollowUpAgent(Agent):
         except Exception:
             pass
 
-    async def _transfer(self, transfer_to: str | None) -> bool:
+    async def _transfer(self, transfer_to: str | None, question_id: str | None = None) -> bool:
         if not transfer_to:
             return False
-        ctx = get_job_context()
-        try:
-            response = await ctx.api.sip.transfer_sip_participant(
-                api.TransferSIPParticipantRequest(
-                    room_name=ctx.room.name,
-                    participant_identity=self.participant_identity,
-                    transfer_to=f"tel:{transfer_to}",
-                )
-            )
-        except Exception as exc:
-            logger.error(
-                "sip transfer failed",
-                extra={"error_type": type(exc).__name__},
-            )
-            return False
-        if response.status != api.STS_TRANSFER_SUCCESSFUL:
-            logger.error(
-                "sip transfer failed",
-                extra={"error_type": "UnexpectedTransferStatus"},
-            )
-            return False
-        return True
+        ids = [question.id for question in self._plan.questions]
+        return await warm_transfer(
+            LiveKitSip(get_job_context()),
+            responder_e164=transfer_to,
+            say=lambda text: self.session.say(text, allow_interruptions=False),
+            language=self._plan.language.split("-")[0],
+            question_number=ids.index(question_id) + 1 if question_id in ids else 1,
+        )
+
+    async def _leave_call(self) -> None:
+        """Leave the patient and the care team connected; the room closes when they hang up."""
+        get_job_context().shutdown(reason="transferred to care team")
 
     async def _end_call(self) -> None:
         ctx = get_job_context()
         await ctx.api.room.delete_room(api.DeleteRoomRequest(room=ctx.room.name))
+
+
+class LiveKitSip:
+    """SipControl over the LiveKit room the call runs in."""
+
+    def __init__(self, ctx: JobContext) -> None:
+        self._ctx = ctx
+
+    async def dial(self, to: str, identity: str) -> None:
+        await self._ctx.api.sip.create_sip_participant(
+            api.CreateSIPParticipantRequest(
+                room_name=self._ctx.room.name,
+                sip_trunk_id=settings.livekit_sip_outbound_trunk_id,
+                sip_call_to=to,
+                participant_identity=identity,
+                participant_name="Care team",
+                wait_until_answered=True,
+            )
+        )
+
+    async def wait_for_digit(self, identity: str, digit: str, timeout: float) -> bool:
+        pressed = asyncio.Event()
+
+        def on_dtmf(dtmf) -> None:
+            if dtmf.participant and dtmf.participant.identity == identity and dtmf.digit == digit:
+                pressed.set()
+
+        self._ctx.room.on("sip_dtmf_received", on_dtmf)
+        try:
+            await asyncio.wait_for(pressed.wait(), timeout)
+            return True
+        except TimeoutError:
+            return False
+        finally:
+            self._ctx.room.off("sip_dtmf_received", on_dtmf)
+
+    async def remove(self, identity: str) -> None:
+        await self._ctx.api.room.remove_participant(
+            api.RoomParticipantIdentity(room=self._ctx.room.name, identity=identity)
+        )
 
 
 server = AgentServer()

@@ -24,14 +24,17 @@ class OpenAIAnswerClassifier:
     _SYSTEM_PROMPT = (
         "Classify the caller's latest reply to the question the agent just asked. Read "
         "the reply as an answer to that question: a short yes or no takes its meaning "
-        "from the question. Return red_flag when the caller reports or confirms "
-        "a symptom, warning sign, deterioration, or urgent concern. Return question when "
-        "the caller asks something or does not understand, unless the reply also reports a "
-        "warning sign. Return not_heard when the transcript is empty, background noise, "
-        "a lone greeting or filler, or words that do not answer the question in any "
-        "language; a reply in English is still an answer. Return uncertain "
-        "when meaning is unclear or confidence is low. Return transfer_request when the "
-        "caller asks for a human. Return clear only when none of those conditions apply."
+        "from the question. First set warning_sign: true when any part of the reply reports "
+        "or confirms a symptom, pain, warning sign, deterioration, or urgent concern, even "
+        "when the reply also asks a question, says it does not understand, or denies "
+        "something else; otherwise false. Then set answer. Return red_flag when "
+        "warning_sign is true. Return transfer_request when the caller asks for a human. "
+        "Return question when the caller asks something or does not understand, unless the "
+        "reply also reports a warning sign. Return not_heard when the transcript is empty, "
+        "background noise, a lone greeting or filler, or words that do not answer the "
+        "question in any language; a reply in English is still an answer. Return uncertain "
+        "when meaning is unclear or confidence is low. Return clear only when none of those "
+        "conditions apply."
     )
 
     def __init__(
@@ -66,13 +69,15 @@ class OpenAIAnswerClassifier:
         schema = {
             "type": "object",
             "additionalProperties": False,
+            # warning_sign comes first so the model decides it before anything else.
             "properties": {
+                "warning_sign": {"type": "boolean"},
                 "answer": {
                     "type": "string",
                     "enum": [member.value for member in AnswerKind],
-                }
+                },
             },
-            "required": ["answer"],
+            "required": ["warning_sign", "answer"],
         }
         body = {
             "model": self._model,
@@ -105,6 +110,9 @@ class OpenAIAnswerClassifier:
                 for content in output.get("content", []):
                     if content.get("type") == "output_text":
                         parsed = json.loads(content["text"])
+                        # Code, not the model's label, makes any warning sign a red flag.
+                        if parsed.get("warning_sign") is True:
+                            return AnswerKind.RED_FLAG
                         return AnswerKind(parsed["answer"])
         except (
             HTTPError,

@@ -107,3 +107,24 @@ def test_classifier_separates_noise_from_answers() -> None:
 
     assert "Return not_heard" in prompt
     assert "a reply in English is still an answer" in prompt
+
+
+def test_a_warning_sign_wins_even_when_the_reply_is_also_a_question() -> None:
+    captured = {}
+
+    def open_request(request, timeout):
+        captured["body"] = json.loads(request.data)
+        text = '{"warning_sign":true,"answer":"question"}'
+        return FakeResponse({"output": [{"content": [{"type": "output_text", "text": text}]}]})
+
+    classifier = OpenAIAnswerClassifier(
+        base_url="https://model.example/v1", api_key="secret", model="m", opener=open_request
+    )
+
+    result = asyncio.run(classifier.classify("وش يعني ضيق نفس؟ أحس صدري يوجعني"))
+
+    schema = captured["body"]["text"]["format"]["schema"]
+    assert result is AnswerKind.RED_FLAG
+    assert list(schema["properties"]) == ["warning_sign", "answer"]  # decided first
+    assert schema["properties"]["warning_sign"]["type"] == "boolean"
+    assert schema["required"] == ["warning_sign", "answer"]

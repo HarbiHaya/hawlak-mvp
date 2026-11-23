@@ -90,7 +90,7 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
     time or an interval. With no chosen time the reminder goes at approval.
   - The model only phrases these fields in the patient's dialect; it never calculates.
 - WhatsApp template for the photo request: the code sends it when
-  `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names an approved template; otherwise plain text.
+  `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names an approved template; otherwise a voice note.
 - Caregiver photo upload: in the caregiver view, the registered caregiver can upload a
   box photo for any approved medicine that has no usable photo (the patient sent none,
   or it was unclear). It goes through the same label check and gets the same fixed

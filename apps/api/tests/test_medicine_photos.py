@@ -495,8 +495,10 @@ def test_the_upload_route_takes_images_only_and_never_from_the_insurer(client, d
 class LiveFakes:
     def __init__(self):
         self.calls: list[tuple] = []
+        self.rendered: list[str] = []
 
     async def render(self, script):
+        self.rendered.append(script.spoken_text_ar)
         return SimpleNamespace(audio=b"ogg")
 
     async def upload_audio(self, audio, filename):
@@ -546,11 +548,12 @@ def payload(kind: str, **values) -> JourneyDeliveryPayload:
 
 
 @pytest.mark.anyio
-async def test_live_delivery_sends_the_photo_request_as_text():
+async def test_live_delivery_speaks_the_photo_request_as_a_voice_note():
     fakes = LiveFakes()
     ref = await live_adapter(fakes).deliver(payload("photo_request", text="Please photograph"))
-    assert ref == "wamid.text"
-    assert fakes.calls == [("text", PATIENT, "Please photograph")]
+    assert ref == "wamid.audio"
+    assert fakes.calls == [("audio", PATIENT)]
+    assert fakes.rendered == ["Please photograph"]
 
 
 @pytest.mark.anyio

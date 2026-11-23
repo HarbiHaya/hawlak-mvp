@@ -141,7 +141,8 @@ creates `* 2` duplicate files and folders. Never commit them. Delete them from
   paste keys into their local `.env` themselves.
 - The stack stays running unless Haya asks for cleanup.
 - WhatsApp sends free-form messages only within 24 hours of the patient's last
-  message. The photo request goes as a template when
+  message. Inside the window every patient message is a voice note, the photo
+  request included. The photo request goes as a text template when
   `WHATSAPP_PHOTO_REQUEST_TEMPLATE` names one Meta has approved. When
   `WHATSAPP_OPENER_TEMPLATE` is set, approval sends that opener (again after 4
   hours), and the voice note and other free-form messages wait until the patient

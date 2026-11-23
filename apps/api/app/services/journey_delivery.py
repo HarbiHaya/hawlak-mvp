@@ -122,27 +122,12 @@ class LiveJourneyDeliveryAdapter:
                 return await self._whatsapp.send_template(
                     payload.phone_e164, template, payload.language, list(payload.template_values)
                 )
-            return await self._whatsapp.send_text(payload.phone_e164, payload.text)
+            # Inside the window the request is spoken, like every other patient message.
+            return await self._send_voice(payload, payload.text)
         if not payload.voice_script:
             raise JourneyDeliveryError("approved voice script is missing")
 
-        checksum = checksum_script(payload.voice_script)
-        rendered = await self._renderer.render(
-            ApprovedVoiceScript(
-                artifactId=payload.run_id,
-                caseId=payload.case_id,
-                synthetic=True,
-                spokenTextAr=payload.voice_script,
-                scriptChecksum=checksum,
-                approved=True,
-                approvedBy=payload.approved_by,
-            )
-        )
-        audio_id = await self._whatsapp.upload_audio(
-            rendered.audio,
-            f"hawlak-{payload.run_id}.ogg",
-        )
-        voice_message_id = await self._whatsapp.send_audio(payload.phone_e164, audio_id)
+        voice_message_id = await self._send_voice(payload, payload.voice_script)
         if payload.kind == "discharge_voice_note":
             return voice_message_id
 
@@ -161,6 +146,21 @@ class LiveJourneyDeliveryAdapter:
             payload.phone_e164, image_id, payload.language
         )
         return f"{voice_message_id},{reminder_message_id}"
+
+    async def _send_voice(self, payload: JourneyDeliveryPayload, script: str) -> str:
+        rendered = await self._renderer.render(
+            ApprovedVoiceScript(
+                artifactId=payload.run_id,
+                caseId=payload.case_id,
+                synthetic=True,
+                spokenTextAr=script,
+                scriptChecksum=checksum_script(script),
+                approved=True,
+                approvedBy=payload.approved_by,
+            )
+        )
+        audio_id = await self._whatsapp.upload_audio(rendered.audio, f"hawlak-{payload.run_id}.ogg")
+        return await self._whatsapp.send_audio(payload.phone_e164, audio_id)
 
     async def _dispatch_call(self, payload: JourneyDeliveryPayload) -> str:
         if (

@@ -69,6 +69,9 @@ pull request reviewed by both Haya and Retaj.
   Opening, completion and transfer scripts are spoken word for word, and the
   care-team transfer lines are fixed in `TRANSFER_LINES` (`transfer.py`), like
   `PHOTO_REPLIES`.
+- Code decides every transfer; the model never does. Transfers run on LiveKit's
+  `WarmTransferTask` (`CareTeamTransfer`), and only the care team pressing 1
+  connects the patient. Never give the briefing model a tool that connects the call.
 - The voice note carries discharge instructions only. Medicines go in their own
   reminders and the photo request, never in the voice note.
 - Never log tokens or full phone numbers (last 4 digits only).

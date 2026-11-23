@@ -24,17 +24,11 @@ class TestAgent(HawlakFollowUpAgent):
         self._outcome_tasks = set()
         self._turns = []
         self._verbatim = set()
+        self._escalation = None
         self.events = events
-
-    async def _transfer(self, transfer_to, question_id=None):
-        self.events.append(("transfer", transfer_to))
-        return True
 
     async def _end_call(self):
         self.events.append(("end", None))
-
-    async def _leave_call(self):
-        self.events.append(("leave", None))
 
 
 class FakeOutcomeClient:
@@ -58,7 +52,7 @@ class FakeOutcomeClient:
             raise RuntimeError("sensitive transcript +966500000000")
 
 
-def test_worker_transfers_before_reporting_structured_outcome() -> None:
+def test_an_accepted_transfer_is_reported_and_the_call_stays_open() -> None:
     events = []
     agent = TestAgent(FakeOutcomeClient(events), events)
     action = CallAction(
@@ -69,18 +63,10 @@ def test_worker_transfers_before_reporting_structured_outcome() -> None:
         answer_kind=AnswerKind.RED_FLAG,
     )
 
-    asyncio.run(agent._handle_terminal_action(action))
+    asyncio.run(agent.finish(action, transferred=True))
 
-    assert events == [
-        ("transfer", "+966511111111"),
-        (
-            "report_transferred",
-            "run-synthetic-001",
-            "red-flags",
-            AnswerKind.RED_FLAG,
-        ),
-        ("leave", None),  # the patient and the care team stay connected; no room teardown
-    ]
+    # the patient and the care team stay connected; no room teardown
+    assert events == [("report_transferred", "run-synthetic-001", "red-flags", AnswerKind.RED_FLAG)]
 
 
 def test_reporting_failure_does_not_prevent_completed_call_end(caplog) -> None:
@@ -89,7 +75,7 @@ def test_reporting_failure_does_not_prevent_completed_call_end(caplog) -> None:
     action = CallAction(kind=CallActionKind.COMPLETE, spoken_text="Approved completion")
 
     with caplog.at_level(logging.ERROR, logger="hawlak-call-agent"):
-        asyncio.run(agent._handle_terminal_action(action))
+        asyncio.run(agent.finish(action))
 
     assert events == [
         ("end", None),
@@ -100,18 +86,9 @@ def test_reporting_failure_does_not_prevent_completed_call_end(caplog) -> None:
     assert "+966500000000" not in caplog.text
 
 
-@pytest.mark.parametrize("transfer_raises", [False, True])
-def test_failed_transfer_reports_failed_then_safely_ends_room(transfer_raises, caplog) -> None:
+def test_a_failed_transfer_reports_failed_then_ends_the_room() -> None:
     events = []
-
-    class FailedTransferAgent(TestAgent):
-        async def _transfer(self, transfer_to, question_id=None):
-            self.events.append(("transfer", transfer_to))
-            if transfer_raises:
-                raise RuntimeError("provider request +966511111111")
-            return False
-
-    agent = FailedTransferAgent(FakeOutcomeClient(events), events)
+    agent = TestAgent(FakeOutcomeClient(events), events)
     action = CallAction(
         kind=CallActionKind.TRANSFER,
         spoken_text="Approved transfer",
@@ -120,53 +97,90 @@ def test_failed_transfer_reports_failed_then_safely_ends_room(transfer_raises, c
         answer_kind=AnswerKind.UNCERTAIN,
     )
 
-    with caplog.at_level(logging.ERROR, logger="hawlak-call-agent"):
-        asyncio.run(agent._handle_terminal_action(action))
+    asyncio.run(agent.finish(action, transferred=False))
 
     assert events == [
-        ("transfer", "+966511111111"),
         ("end", None),
-        (
-            "report_failed",
-            "run-synthetic-001",
-            "red-flags",
-            AnswerKind.UNCERTAIN,
-        ),
+        ("report_failed", "run-synthetic-001", "red-flags", AnswerKind.UNCERTAIN),
     ]
-    assert "provider request" not in caplog.text
-    assert "+966511111111" not in caplog.text
 
 
-def test_worker_transfer_dials_the_care_team_and_never_refers(monkeypatch) -> None:
-    calls = []
-
-    async def fake_warm_transfer(sip, **kwargs):
-        calls.append(kwargs)
-        return True
-
-    class FakeSipApi:
-        async def transfer_sip_participant(self, request):
-            raise AssertionError("SIP REFER must not be used")
-
-    context = SimpleNamespace(
-        api=SimpleNamespace(sip=FakeSipApi()), room=SimpleNamespace(name="synthetic-room")
-    )
-    monkeypatch.setattr(livekit_worker, "get_job_context", lambda: context)
-    monkeypatch.setattr(livekit_worker, "warm_transfer", fake_warm_transfer)
-    agent = SimpleNamespace(
-        _plan=SimpleNamespace(
-            language="ar-SA",
-            questions=(SimpleNamespace(id="q-1"), SimpleNamespace(id="red-flags")),
-        ),
-        _say=None,
+def test_a_patient_who_hangs_up_during_a_transfer_is_reported_failed() -> None:
+    events = []
+    agent = TestAgent(FakeOutcomeClient(events), events)
+    agent._escalation = CallAction(
+        kind=CallActionKind.TRANSFER,
+        spoken_text="Approved transfer",
+        transfer_to="+966511111111",
+        question_id="red-flags",
+        answer_kind=AnswerKind.RED_FLAG,
     )
 
-    result = asyncio.run(HawlakFollowUpAgent._transfer(agent, "+966511111111", "red-flags"))
+    asyncio.run(agent.on_shutdown())
+    asyncio.run(agent.on_shutdown())  # LiveKit may call shutdown hooks after finish too
 
-    assert result is True
-    assert calls[0]["responder_e164"] == "+966511111111"
-    assert calls[0]["language"] == "ar"
-    assert calls[0]["question_number"] == 2
+    assert events == [("report_failed", "run-synthetic-001", "red-flags", AnswerKind.RED_FLAG)]
+
+
+def test_a_transfer_decision_hands_the_call_to_livekits_warm_transfer() -> None:
+    from livekit.agents import ChatContext, StopResponse
+    from test_conversation import plan
+
+    from hawlak_agent.conversation import CallConversation
+    from hawlak_agent.transfer import CareTeamHandoff
+
+    handed = []
+
+    class Classifier:
+        async def classify(self, transcript, *, question=None):
+            return AnswerKind.RED_FLAG
+
+    class Session:
+        def update_agent(self, new_agent):
+            handed.append(new_agent)
+
+    class Agent(TestAgent):
+        session = Session()
+        llm = None
+
+    agent = Agent(FakeOutcomeClient([]), [])
+    agent._plan = plan()
+    agent.conversation = CallConversation(agent._plan)
+    agent.classifier = Classifier()
+    agent.conversation.start()
+    agent.conversation.next_question()
+
+    with pytest.raises(StopResponse):
+        asyncio.run(
+            agent.on_user_turn_completed(ChatContext(), SimpleNamespace(text_content="صدري يوجعني"))
+        )
+
+    assert isinstance(handed[0], CareTeamHandoff)
+    assert agent._escalation.answer_kind is AnswerKind.RED_FLAG
+
+
+def test_an_empty_transcript_is_not_heard_without_asking_the_classifier() -> None:
+    from livekit.agents import ChatContext
+    from test_conversation import plan
+
+    from hawlak_agent.conversation import CallConversation
+
+    class Classifier:
+        async def classify(self, transcript, *, question=None):
+            raise AssertionError("noise must not reach the classifier")
+
+    agent = TestAgent(FakeOutcomeClient([]), [])
+    agent._plan = plan()
+    agent.conversation = CallConversation(agent._plan)
+    agent.classifier = Classifier()
+    agent.conversation.start()
+    agent.conversation.next_question()
+    turn_ctx = ChatContext()
+
+    asyncio.run(agent.on_user_turn_completed(turn_ctx, SimpleNamespace(text_content="  ")))
+
+    assert agent._turns[-1]["answerKind"] == "not_heard"
+    assert "did not catch" in turn_ctx.items[-1].text_content
 
 
 def test_completed_outcome_survives_room_teardown_cancellation() -> None:
@@ -187,7 +201,7 @@ def test_completed_outcome_survives_room_teardown_cancellation() -> None:
         agent = CancellingAgent(SlowOutcomeClient(events), events)
         action = CallAction(kind=CallActionKind.COMPLETE, spoken_text="Approved completion")
         with pytest.raises(asyncio.CancelledError):
-            await agent._handle_terminal_action(action)
+            await agent.finish(action)
         await asyncio.sleep(0)
 
     asyncio.run(exercise())
@@ -305,9 +319,7 @@ def test_turns_are_sent_when_the_call_ends() -> None:
     agent._turns = [{"seq": 1, "speaker": "agent", "text": "مرحباً"}]
 
     asyncio.run(
-        agent._handle_terminal_action(
-            CallAction(kind=CallActionKind.COMPLETE, spoken_text="Approved completion")
-        )
+        agent.finish(CallAction(kind=CallActionKind.COMPLETE, spoken_text="Approved completion"))
     )
 
     assert ("turns", "run-synthetic-001", [1]) in events

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import hashlib
 import logging
 import re
@@ -27,11 +28,18 @@ from .outcome_client import CallOutcomeClient
 from .plan_client import ApprovedPlanClient
 from .settings import AgentSettings
 from .speech_guard import agent_instructions, check_speech, directive
-from .transfer import warm_transfer
+from .transfer import CareTeamHandoff
 
 logger = logging.getLogger("hawlak-call-agent")
 settings = AgentSettings.from_env()
 _SENTENCE_END = re.compile(r"(?<=[.!?؟])\s+")
+# Context for speech-to-text: short phone replies in the patient's language.
+STT_PROMPTS = {
+    "ar": "مكالمة متابعة طبية باللهجة السعودية بعد الخروج من المستشفى. "
+    "الردود قصيرة غالباً مثل: لا، إيه، نعم، لا الحمد لله، ما فهمت.",
+    "en": "A medical follow-up phone call after hospital discharge. Replies are often short, "
+    "like yes, no, I'm fine, sorry what.",
+}
 
 
 class HawlakFollowUpAgent(Agent):
@@ -62,6 +70,8 @@ class HawlakFollowUpAgent(Agent):
         self._turns: list[dict[str, Any]] = []
         # Approved lines spoken word for word (scripts, transfer lines); the guard lets them pass.
         self._verbatim: set[str] = set()
+        # The transfer that has started but not been reported yet; reported failed on hang-up.
+        self._escalation: CallAction | None = None
 
     async def begin(self) -> None:
         await self._say(self.conversation.start().spoken_text)
@@ -72,13 +82,8 @@ class HawlakFollowUpAgent(Agent):
         await self.session.say(text, allow_interruptions=False)
 
     async def on_user_turn_completed(self, turn_ctx: ChatContext, new_message: ChatMessage) -> None:
-        patient_text = new_message.text_content or ""
-        try:
-            answer = await self.classifier.classify(
-                patient_text, question=self.conversation.current_question
-            )
-        except ClassificationError:
-            answer = AnswerKind.UNCERTAIN
+        patient_text = (new_message.text_content or "").strip()
+        answer = await self._classify(patient_text)
         self._add_turn("patient", patient_text, answerKind=answer.value)
 
         action = self.conversation.record_answer(answer)
@@ -87,9 +92,29 @@ class HawlakFollowUpAgent(Agent):
             turn_ctx.add_message(role="system", content=directive(action))
             return
 
+        if action.kind is CallActionKind.TRANSFER:
+            # Code decided; LiveKit's warm transfer runs in its own agent from here on.
+            self._escalation = action
+            self.session.update_agent(
+                CareTeamHandoff(
+                    self, action, sip_trunk_id=settings.livekit_sip_outbound_trunk_id, llm=self.llm
+                )
+            )
+            raise StopResponse()
+
         await self._say(action.spoken_text)
-        await self._handle_terminal_action(action)
+        await self.finish(action)
         raise StopResponse()
+
+    async def _classify(self, patient_text: str) -> AnswerKind:
+        if not patient_text:
+            return AnswerKind.NOT_HEARD
+        try:
+            return await self.classifier.classify(
+                patient_text, question=self.conversation.current_question
+            )
+        except ClassificationError:
+            return AnswerKind.UNCERTAIN
 
     def tts_node(self, text: AsyncIterable[str], model_settings):
         return Agent.default.tts_node(self, self._guarded(text), model_settings)
@@ -149,52 +174,43 @@ class HawlakFollowUpAgent(Agent):
         except Exception as exc:
             logger.error("call turns reporting failed", extra={"error_type": type(exc).__name__})
 
-    async def _handle_terminal_action(self, action: CallAction) -> None:
-        if action.kind is CallActionKind.TRANSFER:
+    async def finish(self, action: CallAction, *, transferred: bool = False) -> None:
+        """Report the outcome and store the transcript. A transferred call stays open for the
+        patient and the care team; any other call ends here."""
+        self._escalation = None
+        if action.kind is CallActionKind.COMPLETE:
+            report = self.outcome_client.record_completed(self._plan.id)
+        else:
             if action.question_id is None or action.answer_kind is None:
                 raise ValueError("transfer action is missing its escalation outcome")
-            transferred = await self._attempt_transfer(action.transfer_to, action.question_id)
-            if transferred:
-                outcome_task = self._start_outcome_task(
-                    self.outcome_client.record_transferred(
-                        self._plan.id,
-                        question_id=action.question_id,
-                        answer_kind=action.answer_kind,
-                    )
-                )
-                await self._wait_for_outcome(outcome_task)
-                await self.send_turns()
-                await self._leave_call()
-                return
-            outcome_task = self._start_outcome_task(
-                self.outcome_client.record_failed(
-                    self._plan.id,
-                    question_id=action.question_id,
-                    answer_kind=action.answer_kind,
-                )
+            record = (
+                self.outcome_client.record_transferred
+                if transferred
+                else self.outcome_client.record_failed
             )
-        elif action.kind is CallActionKind.COMPLETE:
-            outcome_task = self._start_outcome_task(
-                self.outcome_client.record_completed(self._plan.id)
+            report = record(
+                self._plan.id, question_id=action.question_id, answer_kind=action.answer_kind
             )
-        else:
+        outcome_task = self._start_outcome_task(report)
+        if transferred:
+            await self._wait_for_outcome(outcome_task)
+            await self.send_turns()
             return
-
         try:
             await self._attempt_end_call()
         finally:
             await self.send_turns()
             await self._wait_for_outcome(outcome_task)
 
-    async def _attempt_transfer(self, transfer_to: str | None, question_id: str) -> bool:
-        try:
-            return await self._transfer(transfer_to, question_id)
-        except Exception as exc:
-            logger.error(
-                "sip transfer failed",
-                extra={"error_type": type(exc).__name__},
-            )
-            return False
+    async def on_shutdown(self) -> None:
+        """The patient hung up: a transfer still in progress counts as failed."""
+        if (action := self._escalation) is not None:
+            self._escalation = None
+            with contextlib.suppress(Exception):
+                await self.outcome_client.record_failed(
+                    self._plan.id, question_id=action.question_id, answer_kind=action.answer_kind
+                )
+        await self.send_turns()
 
     async def _attempt_end_call(self) -> None:
         try:
@@ -233,65 +249,9 @@ class HawlakFollowUpAgent(Agent):
         except Exception:
             pass
 
-    async def _transfer(self, transfer_to: str | None, question_id: str | None = None) -> bool:
-        if not transfer_to:
-            return False
-        ids = [question.id for question in self._plan.questions]
-        return await warm_transfer(
-            LiveKitSip(get_job_context()),
-            responder_e164=transfer_to,
-            say=self._say,
-            language=self._plan.language.split("-")[0],
-            question_number=ids.index(question_id) + 1 if question_id in ids else 1,
-        )
-
-    async def _leave_call(self) -> None:
-        """Leave the patient and the care team connected; the room closes when they hang up."""
-        get_job_context().shutdown(reason="transferred to care team")
-
     async def _end_call(self) -> None:
         ctx = get_job_context()
         await ctx.api.room.delete_room(api.DeleteRoomRequest(room=ctx.room.name))
-
-
-class LiveKitSip:
-    """SipControl over the LiveKit room the call runs in."""
-
-    def __init__(self, ctx: JobContext) -> None:
-        self._ctx = ctx
-
-    async def dial(self, to: str, identity: str) -> None:
-        await self._ctx.api.sip.create_sip_participant(
-            api.CreateSIPParticipantRequest(
-                room_name=self._ctx.room.name,
-                sip_trunk_id=settings.livekit_sip_outbound_trunk_id,
-                sip_call_to=to,
-                participant_identity=identity,
-                participant_name="Care team",
-                wait_until_answered=True,
-            )
-        )
-
-    async def wait_for_digit(self, identity: str, digit: str, timeout: float) -> bool:
-        pressed = asyncio.Event()
-
-        def on_dtmf(dtmf) -> None:
-            if dtmf.participant and dtmf.participant.identity == identity and dtmf.digit == digit:
-                pressed.set()
-
-        self._ctx.room.on("sip_dtmf_received", on_dtmf)
-        try:
-            await asyncio.wait_for(pressed.wait(), timeout)
-            return True
-        except TimeoutError:
-            return False
-        finally:
-            self._ctx.room.off("sip_dtmf_received", on_dtmf)
-
-    async def remove(self, identity: str) -> None:
-        await self._ctx.api.room.remove_participant(
-            api.RoomParticipantIdentity(room=self._ctx.room.name, identity=identity)
-        )
 
 
 server = AgentServer()
@@ -339,10 +299,12 @@ async def outbound_follow_up(ctx: JobContext) -> None:
             settings.hawlak_internal_api_token,
         ),
     )
+    language = plan.language.split("-")[0]
     session = AgentSession(
         stt=openai.STT(
             model=settings.openai_stt_model,
-            language=plan.language.split("-")[0],
+            language=language,
+            prompt=STT_PROMPTS.get(language, STT_PROMPTS["en"]),
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url,
         ),
@@ -350,10 +312,16 @@ async def outbound_follow_up(ctx: JobContext) -> None:
             api_key=settings.elevenlabs_api_key,
             voice_id=settings.elevenlabs_voice_id,
             model=settings.elevenlabs_model_id,
-            language=plan.language.split("-")[0],
+            language=language,
         ),
+        turn_handling={
+            # The transcript arrives after the pause; wait for it before taking the turn.
+            "endpointing": {"min_delay": 0.8},
+            # Code adds the step for each reply, so a reply drafted early is always thrown away.
+            "preemptive_generation": {"enabled": False},
+        },
     )
-    ctx.add_shutdown_callback(agent.send_turns)  # also covers a patient who hangs up
+    ctx.add_shutdown_callback(agent.on_shutdown)  # a patient who hangs up mid-call or mid-transfer
     await session.start(agent=agent, room=ctx.room)
     await agent.begin()
 

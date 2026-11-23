@@ -147,3 +147,29 @@ def test_cannot_complete_before_every_question_is_answered() -> None:
 
     assert first.kind is CallActionKind.SPEAK and first.question_id == "red-flags"
     assert last.kind is CallActionKind.COMPLETE
+
+
+def test_noise_repeats_the_question_without_counting_toward_a_transfer() -> None:
+    conversation = CallConversation(plan())
+    conversation.start()
+    conversation.next_question()
+
+    for _ in range(2):
+        action = conversation.record_answer(AnswerKind.NOT_HEARD)
+        assert action.kind is CallActionKind.CLARIFY
+        assert action.answer_kind is AnswerKind.NOT_HEARD
+    assert conversation.record_answer(AnswerKind.QUESTION).kind is CallActionKind.CLARIFY
+    assert conversation.record_answer(AnswerKind.CLEAR).kind is CallActionKind.SPEAK
+
+
+def test_a_third_unheard_reply_transfers() -> None:
+    conversation = CallConversation(plan())
+    conversation.start()
+    conversation.next_question()
+
+    for _ in range(2):
+        conversation.record_answer(AnswerKind.NOT_HEARD)
+    action = conversation.record_answer(AnswerKind.NOT_HEARD)
+
+    assert action.kind is CallActionKind.TRANSFER
+    assert action.answer_kind is AnswerKind.NOT_HEARD

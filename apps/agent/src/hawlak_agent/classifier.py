@@ -27,7 +27,9 @@ class OpenAIAnswerClassifier:
         "from the question. Return red_flag when the caller reports or confirms "
         "a symptom, warning sign, deterioration, or urgent concern. Return question when "
         "the caller asks something or does not understand, unless the reply also reports a "
-        "warning sign. Return uncertain "
+        "warning sign. Return not_heard when the transcript is empty, background noise, "
+        "a lone greeting or filler, or words that do not answer the question in any "
+        "language; a reply in English is still an answer. Return uncertain "
         "when meaning is unclear or confidence is low. Return transfer_request when the "
         "caller asks for a human. Return clear only when none of those conditions apply."
     )

@@ -9,11 +9,19 @@ team will help. `speech_guard.py` replaces any generated sentence that carries a
 number outside the approved content, or runs over 40 words, with the approved
 question. Opening, completion and transfer scripts are spoken word for word.
 
-A first unclear reply or question gets one clarification. A second one, a red
-flag or a request for a person transfers the call: the agent dials the care team
-into the room, and the transfer counts only when they press 1. Otherwise the
-patient hears the fixed callback line and the call is recorded as failed. Each
-call's turns are stored in Hawlak for the insurer workspace only.
+A first unclear reply or question gets one clarification. Noise, an empty
+transcript or a stray word ("not heard") repeats the question up to twice without
+counting toward a transfer. A second unclear reply, a third unheard one, a red
+flag or a request for a person transfers the call. Code makes that decision and
+hands the call to `CareTeamHandoff` (`transfer.py`), which runs LiveKit's
+`WarmTransferTask`: the patient hears a ringback tone while the care team is
+dialled into a side room; the care team hears a fixed line, and an agent answers
+their questions about the call from its transcript. Only the care team pressing
+1 joins them to the patient; the model has no tool that connects the call, so a
+voicemail can never count. With no answer in 30 seconds, or no key press 45
+seconds after answering, the patient hears the fixed callback line and the call
+is recorded as failed. A patient who hangs up mid-transfer is recorded as failed
+too. Each call's turns are stored in Hawlak for the insurer workspace only.
 
 ## Interfaces
 

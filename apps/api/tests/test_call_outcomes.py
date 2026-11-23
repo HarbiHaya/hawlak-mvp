@@ -1,3 +1,5 @@
+import pytest
+
 from app.models import Alert, WorkflowEvent
 
 
@@ -458,7 +460,8 @@ def test_call_plan_carries_the_approved_facts(client, internal_auth_headers):
     ]
 
 
-def test_a_second_unclear_answer_is_a_valid_escalation(client, internal_auth_headers):
+@pytest.mark.parametrize("kind", ["question", "not_heard"])
+def test_unclear_and_unheard_answers_are_valid_escalations(client, internal_auth_headers, kind):
     call_run = next(
         r
         for r in approved_runs(client, internal_auth_headers, "case_call_question")
@@ -470,9 +473,9 @@ def test_a_second_unclear_answer_is_a_valid_escalation(client, internal_auth_hea
         f"/internal/delivery-runs/{call_run['id']}/call-outcome",
         json={
             "status": "transferred",
-            "escalation": {"questionId": "red-flag", "answerKind": "question"},
+            "escalation": {"questionId": "red-flag", "answerKind": kind},
         },
-        headers={**internal_auth_headers, "Idempotency-Key": "call-question-1"},
+        headers={**internal_auth_headers, "Idempotency-Key": f"call-{kind}-1"},
     )
 
     assert response.status_code == 200, response.text

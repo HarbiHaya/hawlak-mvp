@@ -54,3 +54,17 @@ def test_instructions_carry_the_facts_and_forbid_advice() -> None:
 
     assert "امش ٢٠ دقيقة كل يوم." in text
     assert "Never give medical advice" in text
+
+
+def test_unheard_directive_asks_again_without_answering() -> None:
+    action = CallAction(
+        kind=CallActionKind.CLARIFY,
+        spoken_text="كيف تشعر الآن؟",
+        question_id="general",
+        answer_kind=AnswerKind.NOT_HEARD,
+    )
+
+    text = directive(action)
+
+    assert "did not catch" in text
+    assert text.rstrip().endswith("كيف تشعر الآن؟")

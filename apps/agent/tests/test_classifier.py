@@ -46,6 +46,7 @@ def test_classifier_uses_strict_enum_and_returns_allowed_answer() -> None:
         "uncertain",
         "transfer_request",
         "question",
+        "not_heard",
     ]
 
 
@@ -99,3 +100,10 @@ def test_classifier_offers_question_and_keeps_warning_signs_first() -> None:
     assert "question" in [member.value for member in AnswerKind]
     assert "Return question" in prompt
     assert "unless the reply also reports a warning sign" in prompt
+
+
+def test_classifier_separates_noise_from_answers() -> None:
+    prompt = OpenAIAnswerClassifier._SYSTEM_PROMPT
+
+    assert "Return not_heard" in prompt
+    assert "a reply in English is still an answer" in prompt

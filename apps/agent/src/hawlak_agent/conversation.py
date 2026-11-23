@@ -72,6 +72,7 @@ class AnswerKind(StrEnum):
     UNCERTAIN = "uncertain"
     TRANSFER_REQUEST = "transfer_request"
     QUESTION = "question"
+    NOT_HEARD = "not_heard"
 
 
 class CallActionKind(StrEnum):
@@ -93,6 +94,8 @@ class CallAction(BaseModel):
 
 # One clarifying exchange per question; a second unclear reply goes to a person.
 CLARIFY_LIMIT = 1
+# Noise or an empty transcript repeats the question this many times, then a person calls.
+REPEAT_LIMIT = 2
 
 
 class CallConversation:
@@ -104,6 +107,7 @@ class CallConversation:
         self._plan = plan
         self._question_index = -1
         self._clarified = 0
+        self._repeated = 0
         self._started = False
         self._finished = False
 
@@ -124,6 +128,7 @@ class CallConversation:
         self._ensure_active()
         self._question_index += 1
         self._clarified = 0
+        self._repeated = 0
         if self._question_index >= len(self._plan.questions):
             self._finished = True
             return CallAction(
@@ -143,8 +148,12 @@ class CallConversation:
             raise RuntimeError("no approved question is awaiting an answer")
         question = self._plan.questions[self._question_index]
         unclear = answer in {AnswerKind.QUESTION, AnswerKind.UNCERTAIN}
-        if unclear and self._clarified < CLARIFY_LIMIT:
-            self._clarified += 1
+        repeat = answer is AnswerKind.NOT_HEARD and self._repeated < REPEAT_LIMIT
+        if repeat or (unclear and self._clarified < CLARIFY_LIMIT):
+            if repeat:
+                self._repeated += 1
+            else:
+                self._clarified += 1
             return CallAction(
                 kind=CallActionKind.CLARIFY,
                 spoken_text=question.prompt,

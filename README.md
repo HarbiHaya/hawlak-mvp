@@ -115,9 +115,11 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
     run failed with an alert. Logs carry a hash of the message ID.
   - The follow-up call talks naturally inside approved content: code picks every step,
     a chat model phrases it, and a speech guard checks each sentence. One clarification
-    per question. Transfers dial the care team in and need them to press 1.
+    per question; noise repeats the question instead of counting. Transfers use LiveKit's
+    warm transfer: a ringback tone for the patient, a briefing for the care team, and the
+    call joins only when the care team presses 1.
   - Call transcripts are stored per call for the insurer workspace.
-- Checks: API 289 tests, agent 56 tests, dashboard 28 tests, contracts 3 tests, typecheck and build.
+- Checks: API 291 tests, agent 63 tests, dashboard 28 tests, contracts 3 tests, typecheck and build.
 
 ### Planned / next
 

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import re
 
-from .conversation import CallAction, CallActionKind, CallPlan
+from .conversation import AnswerKind, CallAction, CallActionKind, CallPlan
 
 MAX_WORDS = 40
 _DIGITS = str.maketrans("٠١٢٣٤٥٦٧٨٩۰۱۲۳۴۵۶۷۸۹", "0123456789" * 2)
@@ -54,6 +54,11 @@ def agent_instructions(plan: CallPlan) -> str:
 
 def directive(action: CallAction) -> str:
     # The patient's words stay in their own user message, never in this system note.
+    if action.answer_kind is AnswerKind.NOT_HEARD:
+        return (
+            "Say in a few words that you did not catch that, without guessing what they "
+            f"said. Then ask again, in these words: {action.spoken_text}"
+        )
     if action.kind is CallActionKind.CLARIFY:
         return (
             "Answer only from the approved facts, or say the care team will help; "

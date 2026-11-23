@@ -129,7 +129,7 @@ class PhotoReviewRequest(CamelModel):
 
 class CallEscalation(CamelModel):
     question_id: str = Field(min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_-]+$")
-    answer_kind: Literal["red_flag", "uncertain", "transfer_request"]
+    answer_kind: Literal["red_flag", "uncertain", "transfer_request", "question"]
 
 
 class CallOutcomeRequest(CamelModel):

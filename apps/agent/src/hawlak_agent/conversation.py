@@ -37,6 +37,8 @@ class CallPlan(BaseModel):
     completion_script: str = Field(alias="completionScript")
     transfer_script: str = Field(alias="transferScript")
     responder_phone_e164: str = Field(alias="responderPhoneE164", pattern=r"^\+[1-9]\d{7,14}$")
+    # The approved voice note and reminder scripts: the only facts the agent may state.
+    approved_facts: tuple[str, ...] = Field(default=(), alias="approvedFacts")
 
     @field_validator(
         "id",
@@ -69,10 +71,12 @@ class AnswerKind(StrEnum):
     RED_FLAG = "red_flag"
     UNCERTAIN = "uncertain"
     TRANSFER_REQUEST = "transfer_request"
+    QUESTION = "question"
 
 
 class CallActionKind(StrEnum):
     SPEAK = "speak"
+    CLARIFY = "clarify"
     TRANSFER = "transfer"
     COMPLETE = "complete"
 
@@ -87,14 +91,19 @@ class CallAction(BaseModel):
     transfer_to: str | None = None
 
 
+# One clarifying exchange per question; a second unclear reply goes to a person.
+CLARIFY_LIMIT = 1
+
+
 class CallConversation:
-    """Deterministic state machine; it never creates patient-facing text."""
+    """Deterministic state machine. It owns progress: the model only phrases the step it picks."""
 
     def __init__(self, plan: CallPlan):
         if not plan.approved_at:
             raise ValueError("call plan is not approved")
         self._plan = plan
         self._question_index = -1
+        self._clarified = 0
         self._started = False
         self._finished = False
 
@@ -114,6 +123,7 @@ class CallConversation:
     def next_question(self) -> CallAction:
         self._ensure_active()
         self._question_index += 1
+        self._clarified = 0
         if self._question_index >= len(self._plan.questions):
             self._finished = True
             return CallAction(
@@ -131,9 +141,18 @@ class CallConversation:
         self._ensure_active()
         if self._question_index < 0:
             raise RuntimeError("no approved question is awaiting an answer")
+        question = self._plan.questions[self._question_index]
+        unclear = answer in {AnswerKind.QUESTION, AnswerKind.UNCERTAIN}
+        if unclear and self._clarified < CLARIFY_LIMIT:
+            self._clarified += 1
+            return CallAction(
+                kind=CallActionKind.CLARIFY,
+                spoken_text=question.prompt,
+                question_id=question.id,
+                answer_kind=answer,
+            )
         if answer is not AnswerKind.CLEAR:
             self._finished = True
-            question = self._plan.questions[self._question_index]
             return CallAction(
                 kind=CallActionKind.TRANSFER,
                 spoken_text=self._plan.transfer_script,

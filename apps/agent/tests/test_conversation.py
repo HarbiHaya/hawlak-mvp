@@ -45,8 +45,8 @@ def test_conversation_speaks_only_approved_lines_and_completes() -> None:
     assert completed.spoken_text == plan().completion_script
 
 
-def test_red_flag_uncertainty_and_request_all_transfer() -> None:
-    for answer in (AnswerKind.RED_FLAG, AnswerKind.UNCERTAIN, AnswerKind.TRANSFER_REQUEST):
+def test_red_flag_and_request_transfer_at_once() -> None:
+    for answer in (AnswerKind.RED_FLAG, AnswerKind.TRANSFER_REQUEST):
         conversation = CallConversation(plan())
         conversation.start()
         conversation.next_question()
@@ -95,3 +95,55 @@ def test_current_question_is_the_one_awaiting_an_answer() -> None:
 
     conversation.record_answer(AnswerKind.CLEAR)
     assert conversation.current_question == "هل ظهرت أي علامة تحذيرية ذكرت في تعليمات الخروج؟"
+
+
+def started() -> CallConversation:
+    conversation = CallConversation(plan())
+    conversation.start()
+    conversation.next_question()
+    return conversation
+
+
+def test_a_first_question_or_unsure_reply_lets_the_agent_clarify() -> None:
+    for kind in (AnswerKind.QUESTION, AnswerKind.UNCERTAIN):
+        action = started().record_answer(kind)
+
+        assert action.kind is CallActionKind.CLARIFY
+        assert action.question_id == "general"
+        assert action.spoken_text == "كيف تشعر الآن؟"  # the approved prompt to come back to
+
+
+def test_a_second_unclear_reply_on_the_same_question_transfers() -> None:
+    conversation = started()
+    conversation.record_answer(AnswerKind.QUESTION)
+
+    action = conversation.record_answer(AnswerKind.UNCERTAIN)
+
+    assert action.kind is CallActionKind.TRANSFER
+    assert action.answer_kind is AnswerKind.UNCERTAIN
+
+
+def test_clarifying_one_question_does_not_use_up_the_next_ones() -> None:
+    conversation = started()
+    conversation.record_answer(AnswerKind.QUESTION)
+    conversation.record_answer(AnswerKind.CLEAR)
+
+    assert conversation.record_answer(AnswerKind.QUESTION).kind is CallActionKind.CLARIFY
+
+
+def test_a_warning_sign_transfers_at_once_even_while_clarifying() -> None:
+    for kind in (AnswerKind.RED_FLAG, AnswerKind.TRANSFER_REQUEST):
+        conversation = started()
+        conversation.record_answer(AnswerKind.QUESTION)
+
+        assert conversation.record_answer(kind).kind is CallActionKind.TRANSFER
+
+
+def test_cannot_complete_before_every_question_is_answered() -> None:
+    conversation = started()
+
+    first = conversation.record_answer(AnswerKind.CLEAR)
+    last = conversation.record_answer(AnswerKind.CLEAR)
+
+    assert first.kind is CallActionKind.SPEAK and first.question_id == "red-flags"
+    assert last.kind is CallActionKind.COMPLETE

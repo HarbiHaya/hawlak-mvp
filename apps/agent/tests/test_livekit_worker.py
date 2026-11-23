@@ -22,6 +22,8 @@ class TestAgent(HawlakFollowUpAgent):
         self._plan = SimpleNamespace(id="run-synthetic-001")
         self.outcome_client = outcome_client
         self._outcome_tasks = set()
+        self._turns = []
+        self._verbatim = set()
         self.events = events
 
     async def _transfer(self, transfer_to, question_id=None):
@@ -156,7 +158,7 @@ def test_worker_transfer_dials_the_care_team_and_never_refers(monkeypatch) -> No
             language="ar-SA",
             questions=(SimpleNamespace(id="q-1"), SimpleNamespace(id="red-flags")),
         ),
-        session=SimpleNamespace(say=None),
+        _say=None,
     )
 
     result = asyncio.run(HawlakFollowUpAgent._transfer(agent, "+966511111111", "red-flags"))
@@ -238,7 +240,93 @@ def test_worker_classifies_the_reply_together_with_its_question() -> None:
     agent.conversation.start()
     agent.conversation.next_question()
 
-    with pytest.raises(StopResponse):
-        asyncio.run(agent.on_user_turn_completed(None, SimpleNamespace(text_content="إيه")))
+    del StopResponse
+    from livekit.agents import ChatContext
+
+    turn_ctx = ChatContext()
+    asyncio.run(agent.on_user_turn_completed(turn_ctx, SimpleNamespace(text_content="إيه")))
 
     assert seen == [("إيه", "عندك الحين ضيق نفس شديد؟")]
+    # The model phrases the next step; the directive carries the approved question.
+    assert "أدويتك موجودة عندك؟" in turn_ctx.items[-1].text_content
+    assert agent._turns == [{"seq": 1, "speaker": "patient", "text": "إيه", "answerKind": "clear"}]
+
+
+def guarded_agent():
+    from test_conversation import plan
+
+    from hawlak_agent.conversation import CallConversation
+
+    agent = TestAgent(FakeOutcomeClient([]), [])
+    agent._plan = plan()
+    agent.conversation = CallConversation(agent._plan)
+    agent.conversation.start()
+    agent.conversation.next_question()
+    agent._turns = []
+    agent._verbatim = set()
+    return agent
+
+
+async def collect(agent, chunks):
+    async def stream():
+        for chunk in chunks:
+            yield chunk
+
+    return [piece async for piece in agent._guarded(stream())]
+
+
+def test_a_guarded_sentence_is_replaced_by_the_approved_prompt() -> None:
+    agent = guarded_agent()
+
+    spoken = asyncio.run(collect(agent, ["الحمد لله. خذ 3 ", "حبات الحين. وبعدين"]))
+
+    assert "".join(spoken).strip().endswith("كيف تشعر الآن؟")
+    assert "3" not in "".join(spoken)
+    assert agent._turns[-1]["guard"] == "replaced"
+    assert agent._turns[-1]["speaker"] == "agent"
+
+
+def test_approved_lines_pass_the_guard_verbatim() -> None:
+    agent = guarded_agent()
+    line = "اضغط 1 لاستلام المكالمة."
+    agent._verbatim.add(line)
+
+    spoken = asyncio.run(collect(agent, [line]))
+
+    assert "".join(spoken).strip() == line
+    assert agent._turns[-1]["guard"] == "ok"
+
+
+def test_turns_are_sent_when_the_call_ends() -> None:
+    events = []
+
+    class TurnsClient(FakeOutcomeClient):
+        async def record_turns(self, run_id, turns):
+            self.events.append(("turns", run_id, [t["seq"] for t in turns]))
+
+    agent = TestAgent(TurnsClient(events), events)
+    agent._turns = [{"seq": 1, "speaker": "agent", "text": "مرحباً"}]
+
+    asyncio.run(
+        agent._handle_terminal_action(
+            CallAction(kind=CallActionKind.COMPLETE, spoken_text="Approved completion")
+        )
+    )
+
+    assert ("turns", "run-synthetic-001", [1]) in events
+
+
+def test_the_agent_uses_the_chat_llm_not_the_responses_api(monkeypatch) -> None:
+    from dataclasses import replace
+
+    monkeypatch.setattr(
+        livekit_worker, "settings", replace(livekit_worker.settings, openai_api_key="synthetic")
+    )
+    from livekit.plugins import openai
+    from test_conversation import plan
+
+    agent = HawlakFollowUpAgent(
+        plan=plan(), classifier=None, participant_identity="patient-x", outcome_client=None
+    )
+
+    assert type(agent.llm) is openai.LLM

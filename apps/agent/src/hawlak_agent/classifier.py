@@ -25,7 +25,9 @@ class OpenAIAnswerClassifier:
         "Classify the caller's latest reply to the question the agent just asked. Read "
         "the reply as an answer to that question: a short yes or no takes its meaning "
         "from the question. Return red_flag when the caller reports or confirms "
-        "a symptom, warning sign, deterioration, or urgent concern. Return uncertain "
+        "a symptom, warning sign, deterioration, or urgent concern. Return question when "
+        "the caller asks something or does not understand, unless the reply also reports a "
+        "warning sign. Return uncertain "
         "when meaning is unclear or confidence is low. Return transfer_request when the "
         "caller asks for a human. Return clear only when none of those conditions apply."
     )

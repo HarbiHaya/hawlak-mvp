@@ -337,6 +337,8 @@ class CareJourneyService:
             "transferScript": plan["transferScript"],
             "transferTarget": plan["transferTarget"],
             "responderPhoneE164": plan["responderPhoneE164"],
+            # The only facts the call agent may state when it answers a question.
+            "approvedFacts": self._sent_texts(journey),
         }
 
     def alerts(self) -> list[dict]:
@@ -709,15 +711,21 @@ class CareJourneyService:
         return None
 
     @staticmethod
-    def _patient_identifier(journey: CareJourney, patient: PatientCase) -> str | None:
-        """Scan exactly what will be sent; the reviewer must remove any identifier found."""
-        voice, call = journey.discharge_voice_note, journey.call_plan
+    def _sent_texts(journey: CareJourney) -> list[str]:
+        """The approved voice note and reminder scripts, as they will be sent."""
+        voice = journey.discharge_voice_note
         texts = [voice["script"]] if voice.get("enabled") else []
-        texts += [
+        return texts + [
             m["reminderScript"]
             for m in journey.medications
             if m["dispensed"] and m["reminderEnabled"]
         ]
+
+    @staticmethod
+    def _patient_identifier(journey: CareJourney, patient: PatientCase) -> str | None:
+        """Scan exactly what will be sent; the reviewer must remove any identifier found."""
+        call = journey.call_plan
+        texts = CareJourneyService._sent_texts(journey)
         if call.get("enabled"):
             texts += [call[k] for k in ("openingScript", "completionScript", "transferScript")]
             texts += [q["prompt"] for q in call["questions"]]

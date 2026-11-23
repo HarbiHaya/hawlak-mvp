@@ -443,3 +443,36 @@ def test_call_turn_text_stays_out_of_logs_and_the_caregiver_view(
 
     assert "تفضل" not in caplog.text
     assert "تفضل" not in caregiver.text
+
+
+def test_call_plan_carries_the_approved_facts(client, internal_auth_headers):
+    call_run = next(
+        r for r in approved_runs(client, internal_auth_headers) if r["kind"] == "follow_up_call"
+    )
+
+    plan = client.get(f"/internal/call-plans/{call_run['id']}", headers=internal_auth_headers)
+
+    assert plan.json()["approvedFacts"] == [
+        "هذه تعليمات خروج معتمدة لحالة تجريبية.",
+        "هذا تذكير معتمد لدواء تجريبي جيم.",
+    ]
+
+
+def test_a_second_unclear_answer_is_a_valid_escalation(client, internal_auth_headers):
+    call_run = next(
+        r
+        for r in approved_runs(client, internal_auth_headers, "case_call_question")
+        if r["kind"] == "follow_up_call"
+    )
+    mark_sent(client, internal_auth_headers, call_run["id"])
+
+    response = client.post(
+        f"/internal/delivery-runs/{call_run['id']}/call-outcome",
+        json={
+            "status": "transferred",
+            "escalation": {"questionId": "red-flag", "answerKind": "question"},
+        },
+        headers={**internal_auth_headers, "Idempotency-Key": "call-question-1"},
+    )
+
+    assert response.status_code == 200, response.text

@@ -45,6 +45,7 @@ def test_classifier_uses_strict_enum_and_returns_allowed_answer() -> None:
         "red_flag",
         "uncertain",
         "transfer_request",
+        "question",
     ]
 
 
@@ -89,3 +90,12 @@ def test_classifier_sends_the_approved_question_with_the_reply() -> None:
     assert "question" in system["content"].lower()
     assert question in user["content"]
     assert "إيه" in user["content"]
+
+
+def test_classifier_offers_question_and_keeps_warning_signs_first() -> None:
+    from hawlak_agent.classifier import OpenAIAnswerClassifier
+
+    prompt = OpenAIAnswerClassifier._SYSTEM_PROMPT
+    assert "question" in [member.value for member in AnswerKind]
+    assert "Return question" in prompt
+    assert "unless the reply also reports a warning sign" in prompt

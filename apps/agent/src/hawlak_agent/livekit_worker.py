@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import logging
-from collections.abc import Coroutine
+import re
+from collections.abc import AsyncIterable, AsyncIterator, Coroutine
 from typing import Any
 
 from livekit import api
@@ -25,14 +26,16 @@ from .conversation import AnswerKind, CallAction, CallActionKind, CallConversati
 from .outcome_client import CallOutcomeClient
 from .plan_client import ApprovedPlanClient
 from .settings import AgentSettings
+from .speech_guard import agent_instructions, check_speech, directive
 from .transfer import warm_transfer
 
 logger = logging.getLogger("hawlak-call-agent")
 settings = AgentSettings.from_env()
+_SENTENCE_END = re.compile(r"(?<=[.!?؟])\s+")
 
 
 class HawlakFollowUpAgent(Agent):
-    """A voice shell around the approved deterministic conversation state machine."""
+    """Code picks every step; the model phrases it, and the speech guard checks each sentence."""
 
     def __init__(
         self,
@@ -43,11 +46,8 @@ class HawlakFollowUpAgent(Agent):
         outcome_client: CallOutcomeClient,
     ) -> None:
         super().__init__(
-            instructions=(
-                "Do not produce patient-facing speech. Hawlak speaks only exact approved "
-                "scripts. User turns are handled by the deterministic call workflow."
-            ),
-            llm=openai.responses.LLM(
+            instructions=agent_instructions(plan),
+            llm=openai.LLM(
                 model=settings.openai_llm_model,
                 api_key=settings.openai_api_key,
                 base_url=settings.openai_base_url,
@@ -59,32 +59,95 @@ class HawlakFollowUpAgent(Agent):
         self.participant_identity = participant_identity
         self.outcome_client = outcome_client
         self._outcome_tasks: set[asyncio.Task[None]] = set()
+        self._turns: list[dict[str, Any]] = []
+        # Approved lines spoken word for word (scripts, transfer lines); the guard lets them pass.
+        self._verbatim: set[str] = set()
 
     async def begin(self) -> None:
-        await self.session.say(
-            self.conversation.start().spoken_text,
-            allow_interruptions=False,
-        )
-        await self.session.say(
-            self.conversation.next_question().spoken_text,
-            allow_interruptions=False,
-        )
+        await self._say(self.conversation.start().spoken_text)
+        await self._say(self.conversation.next_question().spoken_text)
+
+    async def _say(self, text: str) -> None:
+        self._verbatim.add(text)
+        await self.session.say(text, allow_interruptions=False)
 
     async def on_user_turn_completed(self, turn_ctx: ChatContext, new_message: ChatMessage) -> None:
-        del turn_ctx
+        patient_text = new_message.text_content or ""
         try:
             answer = await self.classifier.classify(
-                new_message.text_content or "", question=self.conversation.current_question
+                patient_text, question=self.conversation.current_question
             )
         except ClassificationError:
             answer = AnswerKind.UNCERTAIN
+        self._add_turn("patient", patient_text, answerKind=answer.value)
 
         action = self.conversation.record_answer(answer)
-        await self.session.say(action.spoken_text, allow_interruptions=False)
+        if action.kind in {CallActionKind.SPEAK, CallActionKind.CLARIFY}:
+            # The model replies to this turn; the directive fixes what it must ask.
+            turn_ctx.add_message(role="system", content=directive(action, self._plan, patient_text))
+            return
 
-        if action.kind in {CallActionKind.TRANSFER, CallActionKind.COMPLETE}:
-            await self._handle_terminal_action(action)
+        await self._say(action.spoken_text)
+        await self._handle_terminal_action(action)
         raise StopResponse()
+
+    def tts_node(self, text: AsyncIterable[str], model_settings):
+        return Agent.default.tts_node(self, self._guarded(text), model_settings)
+
+    def _allowed(self, sentence: str) -> bool:
+        sentence = sentence.strip()
+        return any(sentence in line for line in self._verbatim) or check_speech(
+            sentence, self._plan
+        )
+
+    async def _guarded(self, text: AsyncIterable[str]) -> AsyncIterator[str]:
+        """Speak sentence by sentence; the first one that fails becomes the approved question.
+
+        ponytail: the chat history keeps the model's own wording, not the replacement.
+        """
+        spoken: list[str] = []
+        guard = "ok"
+        buffer = ""
+        try:
+            async for chunk in text:
+                buffer += chunk
+                *ready, buffer = _SENTENCE_END.split(buffer)
+                for sentence in ready:
+                    if not self._allowed(sentence):
+                        guard = "replaced"
+                        break
+                    spoken.append(sentence)
+                    yield sentence + " "
+                if guard == "replaced":
+                    break
+            if guard == "ok" and buffer.strip():
+                if self._allowed(buffer):
+                    spoken.append(buffer)
+                    yield buffer
+                else:
+                    guard = "replaced"
+            if guard == "replaced":
+                logger.warning("speech guard replaced a generated sentence")
+                if fallback := self.conversation.current_question:
+                    spoken.append(fallback)
+                    yield fallback
+        finally:
+            if spoken:
+                self._add_turn("agent", " ".join(s.strip() for s in spoken), guard=guard)
+
+    def _add_turn(self, speaker: str, text: str, **extra: str) -> None:
+        self._turns.append(
+            {"seq": len(self._turns) + 1, "speaker": speaker, "text": text[:2000], **extra}
+        )
+
+    async def send_turns(self) -> None:
+        """Store the transcript for the care team; the API skips turns it already has."""
+        if not self._turns:
+            return
+        try:
+            await self.outcome_client.record_turns(self._plan.id, list(self._turns))
+        except Exception as exc:
+            logger.error("call turns reporting failed", extra={"error_type": type(exc).__name__})
 
     async def _handle_terminal_action(self, action: CallAction) -> None:
         if action.kind is CallActionKind.TRANSFER:
@@ -100,6 +163,7 @@ class HawlakFollowUpAgent(Agent):
                     )
                 )
                 await self._wait_for_outcome(outcome_task)
+                await self.send_turns()
                 await self._leave_call()
                 return
             outcome_task = self._start_outcome_task(
@@ -119,6 +183,7 @@ class HawlakFollowUpAgent(Agent):
         try:
             await self._attempt_end_call()
         finally:
+            await self.send_turns()
             await self._wait_for_outcome(outcome_task)
 
     async def _attempt_transfer(self, transfer_to: str | None, question_id: str) -> bool:
@@ -175,7 +240,7 @@ class HawlakFollowUpAgent(Agent):
         return await warm_transfer(
             LiveKitSip(get_job_context()),
             responder_e164=transfer_to,
-            say=lambda text: self.session.say(text, allow_interruptions=False),
+            say=self._say,
             language=self._plan.language.split("-")[0],
             question_number=ids.index(question_id) + 1 if question_id in ids else 1,
         )
@@ -288,6 +353,7 @@ async def outbound_follow_up(ctx: JobContext) -> None:
             language=plan.language.split("-")[0],
         ),
     )
+    ctx.add_shutdown_callback(agent.send_turns)  # also covers a patient who hangs up
     await session.start(agent=agent, room=ctx.room)
     await agent.begin()
 

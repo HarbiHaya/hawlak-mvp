@@ -68,3 +68,21 @@ def test_unheard_directive_asks_again_without_answering() -> None:
 
     assert "did not catch" in text
     assert text.rstrip().endswith("كيف تشعر الآن؟")
+
+
+def test_saudi_plans_ask_for_everyday_saudi_dialect() -> None:
+    text = agent_instructions(facts_plan())
+
+    assert "Saudi" in text
+    assert "not formal Arabic" in text
+
+
+def test_clarifying_an_unclear_reply_does_not_volunteer_facts() -> None:
+    action = CallAction(
+        kind=CallActionKind.CLARIFY,
+        spoken_text="كيف تشعر الآن؟",
+        question_id="general",
+        answer_kind=AnswerKind.UNCERTAIN,
+    )
+
+    assert "If they did not ask anything, do not add facts" in directive(action)

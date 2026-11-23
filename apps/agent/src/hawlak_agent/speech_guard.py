@@ -42,14 +42,23 @@ def agent_instructions(plan: CallPlan) -> str:
     facts = "\n".join(f"- {fact}" for fact in plan.approved_facts) or "- (none)"
     return (
         "You are Hawlak's follow-up caller, phoning a patient after hospital discharge on "
-        "behalf of their care team. Speak the patient's dialect "
-        f"({plan.language}), warmly and briefly: one or two short sentences per turn. "
+        f"behalf of their care team. Speak {_dialect(plan.language)}, warmly and briefly: "
+        "one or two short sentences per turn. "
         "Never give medical advice, never change or explain doses, and never state a fact "
         "that is not in the approved facts below. If the patient asks something the facts "
         "do not answer, say the care team will help with it. Each turn you get a system "
         "note with the exact approved question to ask; always end your turn with it.\n"
         f"Approved facts:\n{facts}"
     )
+
+
+def _dialect(language: str) -> str:
+    if language.startswith("ar"):
+        return (
+            "everyday Saudi Arabic, the way people in Saudi Arabia talk on the phone (for "
+            "example: إيه، وش، الحين، زين), not formal Arabic and not another country's dialect"
+        )
+    return "plain, everyday English"
 
 
 def directive(action: CallAction) -> str:
@@ -61,7 +70,8 @@ def directive(action: CallAction) -> str:
         )
     if action.kind is CallActionKind.CLARIFY:
         return (
-            "Answer only from the approved facts, or say the care team will help; "
-            f"never give advice. Then ask again, in these words: {action.spoken_text}"
+            "If they asked something, answer only from the approved facts, or say the care "
+            "team will help; never give advice. If they did not ask anything, do not add "
+            f"facts. Then ask again, in these words: {action.spoken_text}"
         )
     return f"Acknowledge briefly, then ask, in these words: {action.spoken_text}"

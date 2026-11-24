@@ -22,7 +22,7 @@ from app.services.dose_facts import reminder_medication_id
 from app.services.medicine_photos import photo_request_text, photo_request_values
 from app.services.object_storage import ObjectStorage
 from app.services.voice_renderer import build_voice_renderer, checksum_script
-from app.services.whatsapp_client import WhatsAppClient
+from app.services.whatsapp_client import DOSE_QUESTION, WhatsAppClient
 from app.services.whatsapp_factory import build_whatsapp_client
 
 
@@ -127,9 +127,12 @@ class LiveJourneyDeliveryAdapter:
         if not payload.voice_script:
             raise JourneyDeliveryError("approved voice script is missing")
 
-        voice_message_id = await self._send_voice(payload, payload.voice_script)
         if payload.kind == "discharge_voice_note":
-            return voice_message_id
+            return await self._send_voice(payload, payload.voice_script)
+
+        # The reminder voice note ends with the locked button instruction after the approved script.
+        question = DOSE_QUESTION.get(payload.language, DOSE_QUESTION["ar"])
+        voice_message_id = await self._send_voice(payload, f"{payload.voice_script} {question}")
 
         # Every reminder asks "taken (1) or not yet (2)". The checked box photo goes on the
         # question when there is one; without one the question goes with no photo.

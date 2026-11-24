@@ -5,7 +5,7 @@ import { Icon } from "../Icon";
 import { formatDate, formatDateTime, formatShort, pick, plural, type Locale } from "../i18n";
 import { dispatchSummary } from "../readiness";
 import { Badge, EmptyState, Field, Notice, Segmented } from "../ui";
-import { coverageLabel, dialectLabel, factReasonLabel, factSourceLabel, languageLabel, photoCheckLabel, repeatLabel, runKindIcon, runKindLabel, runStatusLabel, runStatusTone, t as texts } from "./text";
+import { coverageLabel, dialectLabel, factReasonLabel, factSourceLabel, languageLabel, photoCheckLabel, repeatLabel, runKindIcon, runKindLabel, runStatusLabel, runStatusTone, doseQuestion, t as texts } from "./text";
 
 type Origin = "generated" | "edited" | "manual";
 const originOf = (current: string, generated: string | undefined): Origin => generated === undefined ? "manual" : current.trim() === generated.trim() ? "generated" : "edited";
@@ -264,7 +264,7 @@ export function MedicationsTab({ api, detail, locale, onChange }: { api: HawlakA
             <label className="switch"><input type="checkbox" role="switch" disabled={locked || !item.dispensed} checked={item.reminderEnabled} onChange={(event) => update(item.medicationId, { reminderEnabled: event.target.checked })} />{t.enableReminder}</label>
             {!item.dispensed && <span className="field__hint" style={{ alignSelf: "center" }}>{t.notDispensedHint}</span>}
           </div>
-          {item.dispensed && item.reminderEnabled && <Field full label={t.reminder} aside={<OriginTag origin={originOf(item.reminderScript, generatedReminder)} locale={locale} />}>{({ id }) => <input id={id} className="input" dir="auto" disabled={locked} value={item.reminderScript} onChange={(event) => update(item.medicationId, { reminderScript: event.target.value })} />}</Field>}
+          {item.dispensed && item.reminderEnabled && <Field full label={t.reminder} hint={t.reminderSuffix.replace("{s}", doseQuestion[detail.languageCode === "en" ? "en" : "ar"])} aside={<OriginTag origin={originOf(item.reminderScript, generatedReminder)} locale={locale} />}>{({ id, describedBy }) => <input id={id} aria-describedby={describedBy} className="input" dir="auto" disabled={locked} value={item.reminderScript} onChange={(event) => update(item.medicationId, { reminderScript: event.target.value })} />}</Field>}
           <Field label={t.unitStrength}>{({ id }) => <input id={id} className="input" dir="ltr" disabled={locked} placeholder="40 mg" value={item.unitStrength ?? ""} onChange={(event) => update(item.medicationId, { unitStrength: event.target.value || null })} />}</Field>
           {/* Parsed when the field loses focus, so commas and spaces can be typed freely. */}
           <Field label={t.reminderTimes} hint={t.timesHint}>{({ id, describedBy }) => <input id={id} className="input" dir="ltr" disabled={locked} placeholder="08:00, 20:00" aria-describedby={describedBy} defaultValue={(item.reminderTimes ?? []).join(", ")} onBlur={(event) => { const times = parseTimes(event.target.value); event.target.value = times.join(", "); update(item.medicationId, { reminderTimes: times }); }} />}</Field>

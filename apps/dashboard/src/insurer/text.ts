@@ -39,7 +39,7 @@ export const t = {
     regenerateTitle: "إعادة إنشاء المسودات", regenerateConfirm: "ستُستبدل نصوص الرسالة الصوتية والتذكيرات والمكالمة الحالية بمسودات جديدة من ملخص الخروج.", regenerated: "أُنشئت مسودات جديدة.",
     mixedLanguage: "ملخص الخروج بلغة مختلفة عن لغة المريض، فبقيت البنود السريرية بلغة الملف. ترجمها قبل الاعتماد.", liveRejected: "لم تجتز مسودة النموذج فحص الأرقام والأدوية، فاستُخدمت القوالب المعتمدة.",
     // Medications
-    medicationName: "اسم الدواء", dose: "الجرعة", reminder: "نص التذكير", dispensed: "صُرف الدواء", enableReminder: "تذكير يومي",
+    medicationName: "اسم الدواء", dose: "الجرعة", reminder: "نص التذكير", reminderSuffix: "تُضاف في نهايته تلقائياً جملة ثابتة لا تُعدَّل: «{s}»", dispensed: "صُرف الدواء", enableReminder: "تذكير يومي",
     uploadImage: "رفع صورة", replaceImage: "استبدال الصورة", uploadingImage: "جارٍ الرفع…", approveImage: "اعتماد الصورة", imageApproved: "صورة معتمدة", imagePending: "صورة بانتظار الاعتماد", imageRejected: "صورة مرفوضة", noImage: "لا توجد صورة",
     addMedication: "إضافة دواء", removeMedication: "حذف الدواء", noMedications: "لا توجد أدوية.", removed: "حُذف «{name}».", undo: "تراجع", unnamed: "دواء بلا اسم",
     notDispensedHint: "يُنشأ تنبيه لفريق الرعاية عند الاعتماد.",
@@ -89,7 +89,7 @@ export const t = {
     notGenerated: "No drafts have been generated for this case.", generate: "Generate drafts", regenerate: "Regenerate", regenerating: "Generating…",
     regenerateTitle: "Regenerate drafts", regenerateConfirm: "The current voice message, reminder and call texts will be replaced with new drafts from the discharge summary.", regenerated: "New drafts generated.",
     mixedLanguage: "The discharge summary is in a different language from the patient's, so clinical items remain in the document's language. Translate them before approval.", liveRejected: "The model draft did not pass the number and medication checks, so approved templates were used.",
-    medicationName: "Medication", dose: "Dose", reminder: "Reminder text", dispensed: "Dispensed", enableReminder: "Daily reminder",
+    medicationName: "Medication", dose: "Dose", reminder: "Reminder text", reminderSuffix: "A fixed sentence is always added at the end and cannot be edited: “{s}”", dispensed: "Dispensed", enableReminder: "Daily reminder",
     uploadImage: "Upload image", replaceImage: "Replace image", uploadingImage: "Uploading…", approveImage: "Approve image", imageApproved: "Image approved", imagePending: "Image awaiting approval", imageRejected: "Image rejected", noImage: "No image",
     addMedication: "Add medication", removeMedication: "Remove medication", noMedications: "No medications.", removed: "“{name}” removed.", undo: "Undo", unnamed: "Unnamed medication",
     notDispensedHint: "An alert is raised for the care team on approval.",
@@ -164,3 +164,9 @@ export const factReasonLabel: Record<string, Bilingual> = {
   not_whole_unit: { ar: "ليست حبة كاملة؛ يراجعها الصيدلي", en: "not a whole tablet; a pharmacist must check" },
 };
 export const alertTypeIcon: Record<string, string> = { medication_access: "pill", call_escalation: "phone", medicine_photo_mismatch: "image", medicine_photos_ready: "image" };
+
+/** Locked: mirrors DOSE_QUESTION in apps/api/app/services/whatsapp_client.py. Ends every reminder. */
+export const doseQuestion = {
+  ar: "إذا أخذته اضغط على الزر الأول، وإذا لا اضغط على الزر الثاني.",
+  en: "If you took it, press the first button. If not, press the second button.",
+} as const;

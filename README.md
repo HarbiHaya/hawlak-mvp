@@ -78,8 +78,9 @@ The demo runs on AWS (eu-north-1): CloudFront → one EC2 instance (Docker Compo
     against that one medicine. Identical photos are read once.
   - Fixed replies only. A mismatch alerts the reviewer, who confirms or marks
     follow-up. Reminders then carry the patient's matched or confirmed box photo.
-  - After every reminder voice note, Hawlak asks the patient to press 1 if the dose was
-    taken or 2 if not yet, in the journey's language, with or without a photo.
+  - Every reminder voice note ends with, and the WhatsApp question that follows says,
+    the locked sentence "إذا أخذته اضغط على الزر الأول، وإذا لا اضغط على الزر الثاني."
+    (button 1 taken, button 2 not yet), in the journey's language, with or without a photo.
 - Sourced dose details (`apps/api/app/services/dose_facts.py`):
   - Each detail carries its source: `prescribed` (in the discharge instructions),
     `calculated` (by code), `reminder_preference` (a chosen time) or `unknown`.

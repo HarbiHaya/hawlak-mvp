@@ -45,9 +45,11 @@ class DownloadedMedia:
     mime_type: str
 
 
+# Locked wording (boundary): every dose reminder, written and spoken, says which button is which.
+# Button 1 is "taken", button 2 is "not yet".
 DOSE_QUESTION = {
-    "ar": "اضغط 1 إذا أخذت الجرعة، أو 2 إذا لم تأخذها بعد.",
-    "en": "Press 1 if you took the dose, or 2 if you have not taken it yet.",
+    "ar": "إذا أخذته اضغط على الزر الأول، وإذا لا اضغط على الزر الثاني.",
+    "en": "If you took it, press the first button. If not, press the second button.",
 }
 
 

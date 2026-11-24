@@ -23,8 +23,8 @@ class FakeReminderWhatsApp:
 
 class FakeRenderer:
     async def render(self, script):
-        assert "اضغطي واحد" in script.spoken_text_ar
-        assert "اثنين" in script.spoken_text_ar
+        assert "اضغطي على الزر الأول" in script.spoken_text_ar
+        assert "الزر الثاني" in script.spoken_text_ar
         return SimpleNamespace(
             audio=b"OggS-reminder",
             audio_checksum="sha256:" + "a" * 64,

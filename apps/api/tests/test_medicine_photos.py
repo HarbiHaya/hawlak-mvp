@@ -583,6 +583,19 @@ async def test_live_reminder_without_a_checked_photo_still_asks_taken_or_not():
     assert ref == "wamid.audio,wamid.question"
     # The voice note, then the 1 / 2 question with no photo on it.
     assert fakes.calls == [("audio", PATIENT), ("dose_question", PATIENT, None, "en")]
+    # The voice note ends by saying which button means what.
+    assert fakes.rendered == [
+        "Dose If you took it, press the first button. If not, press the second button."
+    ]
+
+
+@pytest.mark.anyio
+async def test_an_arabic_reminder_voice_note_says_which_button_to_press():
+    fakes = LiveFakes()
+    await live_adapter(fakes).deliver(payload("medication_reminder", voice_script="وقت دواك."))
+    assert fakes.rendered == [
+        "وقت دواك. إذا أخذته اضغط على الزر الأول، وإذا لا اضغط على الزر الثاني."
+    ]
 
 
 @pytest.mark.anyio
@@ -591,6 +604,7 @@ async def test_the_discharge_voice_note_asks_no_dose_question():
     ref = await live_adapter(fakes).deliver(payload("discharge_voice_note", voice_script="Hello"))
     assert ref == "wamid.audio"
     assert fakes.calls == [("audio", PATIENT)]
+    assert fakes.rendered == ["Hello"]
 
 
 @pytest.mark.anyio

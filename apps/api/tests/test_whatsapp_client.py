@@ -188,9 +188,9 @@ async def test_dose_question_without_a_photo_has_no_header_and_follows_the_langu
     english, arabic = (json.loads(request.content)["interactive"] for request in seen)
     assert "header" not in english and "header" not in arabic
     assert english["body"]["text"] == (
-        "Press 1 if you took the dose, or 2 if you have not taken it yet."
+        "If you took it, press the first button. If not, press the second button."
     )
-    assert arabic["body"]["text"] == "اضغط 1 إذا أخذت الجرعة، أو 2 إذا لم تأخذها بعد."
+    assert arabic["body"]["text"] == "إذا أخذته اضغط على الزر الأول، وإذا لا اضغط على الزر الثاني."
     assert [b["reply"] for b in english["action"]["buttons"]] == [
         {"id": "taken", "title": "1"},
         {"id": "not_yet", "title": "2"},

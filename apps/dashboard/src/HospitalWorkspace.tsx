@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type DragEvent, type FormEven
 
 import { Icon } from "./Icon";
 import { type DialectCode, type HawlakApi, type HospitalCase } from "./api";
-import { displayError, formatDateTime, formatNumber, formatRelative, type Locale } from "./i18n";
+import { displayError, formatDateTime, formatNumber, formatRelative, plural, type Locale } from "./i18n";
 import { Badge, CopyButton, EmptyState, Field, Notice, PageHeader, Segmented } from "./ui";
 
 const labels = {
@@ -120,8 +120,8 @@ export function HospitalWorkspace({ api, locale }: { api: HawlakApi; locale: Loc
       <section className="form-section">
         <h2>{t.patient}</h2>
         <div className="form-section__fields">
-          <Field label={t.name} error={shown("name")}>{({ id, describedBy, invalid }) => <input id={id} data-field="name" className="input" autoComplete="off" value={patientName} aria-describedby={describedBy} aria-invalid={invalid} aria-required="true" onBlur={() => touch("name")} onChange={(event) => setPatientName(event.target.value)} />}</Field>
-          <Field label={t.address} optional={t.optional} hint={t.addressHint}>{({ id, describedBy }) => <input id={id} className="input" autoComplete="off" value={preferredAddress} aria-describedby={describedBy} onChange={(event) => setPreferredAddress(event.target.value)} />}</Field>
+          <Field label={t.name} error={shown("name")}>{({ id, describedBy, invalid }) => <input id={id} data-field="name" className="input" dir="auto" autoComplete="off" value={patientName} aria-describedby={describedBy} aria-invalid={invalid} aria-required="true" onBlur={() => touch("name")} onChange={(event) => setPatientName(event.target.value)} />}</Field>
+          <Field label={t.address} optional={t.optional} hint={t.addressHint}>{({ id, describedBy }) => <input id={id} className="input" dir="auto" autoComplete="off" value={preferredAddress} aria-describedby={describedBy} onChange={(event) => setPreferredAddress(event.target.value)} />}</Field>
         </div>
       </section>
       <section className="form-section">
@@ -166,12 +166,12 @@ const caseLabels = {
   ar: {
     title: "الحالات المرسلة", subtitle: "كل حالة سجّلها المستشفى وموقفها لدى شركة التأمين.", refresh: "تحديث",
     review: "قيد مراجعة شركة التأمين", approved: "اعتُمدت خطة المتابعة", submitted: "أُرسلت", approvedOn: "اعتُمدت",
-    empty: "لم تُسجَّل حالات بعد", emptyHint: "تظهر هنا الحالات بعد إرسالها من صفحة تسجيل حالة.", count: "{n} حالة", waiting: "{n} قيد المراجعة",
+    empty: "لم تُسجَّل حالات بعد", emptyHint: "تظهر هنا الحالات بعد إرسالها من صفحة تسجيل حالة.", count: { one: "حالة واحدة", two: "حالتان", few: "{n} حالات", other: "{n} حالة" }, waiting: { one: "حالة واحدة قيد المراجعة", two: "حالتان قيد المراجعة", few: "{n} حالات قيد المراجعة", other: "{n} حالة قيد المراجعة" },
   },
   en: {
     title: "Submitted cases", subtitle: "Every case the hospital registered and where it stands with the insurer.", refresh: "Refresh",
     review: "Under insurer review", approved: "Follow-up plan approved", submitted: "Submitted", approvedOn: "Approved",
-    empty: "No cases registered yet", emptyHint: "Cases appear here after they are submitted from Register case.", count: "{n} cases", waiting: "{n} under review",
+    empty: "No cases registered yet", emptyHint: "Cases appear here after they are submitted from Register case.", count: { one: "{n} case", other: "{n} cases" }, waiting: { other: "{n} under review" },
   },
 } as const;
 
@@ -191,7 +191,7 @@ export function HospitalCases({ api, locale }: { api: HawlakApi; locale: Locale 
     <PageHeader title={t.title} description={t.subtitle} actions={<button type="button" className="button" onClick={() => void load()}><Icon name="refresh" size={15} />{t.refresh}</button>} />
     {error && <div style={{ marginBottom: 16 }}><Notice tone="danger">{error}</Notice></div>}
     <section className="panel">
-      {cases && cases.length > 0 && <header className="panel__header"><h2>{t.count.replace("{n}", formatNumber(cases.length, locale))}</h2>{waiting > 0 && <Badge tone="warning">{t.waiting.replace("{n}", formatNumber(waiting, locale))}</Badge>}</header>}
+      {cases && cases.length > 0 && <header className="panel__header"><h2>{plural(cases.length, locale, t.count)}</h2>{waiting > 0 && <Badge tone="warning">{plural(waiting, locale, t.waiting)}</Badge>}</header>}
       {cases === null && !error ? <div style={{ padding: 16, display: "grid", gap: 10 }} aria-hidden="true">{[0, 1, 2].map((key) => <div key={key} className="skeleton" style={{ height: 44 }} />)}</div>
         : !cases || cases.length === 0 ? <EmptyState icon="file-plus-2" title={t.empty}><p>{t.emptyHint}</p></EmptyState>
         : <ul className="rows">{cases.map((item) => <li key={item.caseId} className="row">

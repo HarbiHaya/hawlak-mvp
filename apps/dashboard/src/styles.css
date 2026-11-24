@@ -561,3 +561,42 @@ fieldset.editor-block__body { margin: 0; border: 0; min-width: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; }
 }
+
+/* ---------- Caregiver workspace ---------- */
+.caregiver-dashboard { display: grid; gap: var(--space-4); }
+.caregiver-person { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); padding: var(--space-4) var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.caregiver-person span { color: var(--text-3); font-size: 12px; }
+.caregiver-person h2 { font-size: 18px; font-weight: 600; }
+.caregiver-person__meta { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.caregiver-photo-task { display: grid; gap: var(--space-4); padding: var(--space-5); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.caregiver-photo-task__header { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-4); }
+.caregiver-photo-task__header h2 { margin-bottom: 4px; font-size: 16px; font-weight: 600; }
+.caregiver-photo-task__header p { color: var(--text-3); font-size: 13px; }
+.care-photo-progress { display: grid; gap: 6px; }
+.care-photo-progress > span { display: block; height: 6px; overflow: hidden; border-radius: 3px; background: var(--subtle); }
+.care-photo-progress i { display: block; height: 100%; background: var(--blue-600); }
+.care-photo-progress b { color: var(--text-2); font-size: 12px; font-weight: 500; }
+.care-med-list { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: var(--space-3); }
+.care-med { display: grid; align-content: start; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.care-med--missing { border-color: var(--warning-border); }
+.care-med--needs_attention { border-color: var(--danger-border); }
+.care-med__identity { display: flex; align-items: flex-start; gap: var(--space-3); }
+.care-med__identity h3 { margin-bottom: 4px; font-size: 15px; font-weight: 600; }
+.care-med__number { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: var(--blue-50); color: var(--blue-700); }
+.care-med > p { color: var(--text-3); font-size: 13px; }
+.care-med__footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--border); }
+.care-med__reminder { display: inline-flex; align-items: center; gap: 6px; color: var(--text-3); font-size: 12px; }
+.care-med__waiting { color: var(--warning); font-size: 12px; }
+.camera-action { display: inline-flex; align-items: center; gap: var(--space-2); height: var(--control); padding: 0 14px; border-radius: 9px; background: var(--blue-600); color: #fff; font-weight: 500; cursor: pointer; }
+.camera-action:hover { background: var(--blue-700); }
+.camera-action:focus-within { outline: 2px solid var(--blue-600); outline-offset: 2px; }
+.camera-action[aria-disabled="true"] { opacity: .55; cursor: default; pointer-events: none; }
+.photo-coach { display: flex; align-items: flex-start; gap: var(--space-3); padding: var(--space-4); border: 1px solid var(--info-border); border-radius: var(--radius-lg); background: var(--info-bg); }
+.photo-coach > span { display: grid; flex: none; place-items: center; width: 36px; height: 36px; border-radius: 9px; background: var(--surface); color: var(--blue-700); }
+.photo-coach h2 { margin-bottom: 6px; font-size: 14px; font-weight: 600; }
+.photo-coach ol { display: grid; gap: 4px; margin: 0; padding-inline-start: 18px; color: var(--text-2); font-size: 13px; }
+@media (max-width: 640px) {
+  .caregiver-person, .caregiver-photo-task__header { flex-direction: column; align-items: flex-start; }
+  .caregiver-photo-task { padding: var(--space-4); }
+  .camera-action { flex: 1; justify-content: center; }
+}

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import type { CallPlan, CallRepeat, DischargeExtraction, DoseFacts, FactSource, HawlakApi, WorkspaceCaseDetail, WorkspaceMedication } from "../api";
 import { Icon } from "../Icon";
-import { formatDate, formatDateTime, formatShort, pick, type Locale } from "../i18n";
+import { formatDate, formatDateTime, formatShort, pick, plural, type Locale } from "../i18n";
 import { dispatchSummary } from "../readiness";
 import { Badge, EmptyState, Field, Notice, Segmented } from "../ui";
 import { coverageLabel, dialectLabel, factReasonLabel, factSourceLabel, languageLabel, photoCheckLabel, repeatLabel, runKindIcon, runKindLabel, runStatusLabel, runStatusTone, t as texts } from "./text";
@@ -16,14 +16,15 @@ function OriginTag({ origin, locale }: { origin: Origin; locale: Locale }) {
   return <span className={`origin origin--${origin}`}>{origin === "generated" ? t.originGenerated : origin === "edited" ? t.originEdited : t.originManual}</span>;
 }
 
-/** Fetches a case file through the authenticated API and exposes it as an object URL. */
+/** Fetches a case file through the authenticated API as an object URL; null while loading, false if it failed. */
 function useCaseFileUrl(api: HawlakApi, caseId: string, key: string | undefined) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | false | null>(null);
   useEffect(() => {
-    if (!key) { setUrl(null); return; }
+    setUrl(null);
+    if (!key) return;
     let objectUrl: string | null = null;
     let cancelled = false;
-    api.getCaseFile(caseId, key).then((blob) => { if (cancelled) return; objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); }).catch(() => setUrl(null));
+    api.getCaseFile(caseId, key).then((blob) => { if (cancelled) return; objectUrl = URL.createObjectURL(blob); setUrl(objectUrl); }).catch(() => { if (!cancelled) setUrl(false); });
     return () => { cancelled = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [api, caseId, key]);
   return url;
@@ -72,7 +73,7 @@ export function SourceTab({ api, detail, locale }: { api: HawlakApi; detail: Wor
           <details className="disclosure"><summary>{t.fullText}</summary><pre dir={docDir}>{extraction.text}</pre></details>
         </div>
       </section>)}
-    {pdfUrl ? <iframe className="pdf-frame" src={pdfUrl} title={detail.sourceDocument.filename} /> : <div className="skeleton pdf-frame" aria-label={t.loadingPdf} />}
+    {pdfUrl ? <iframe className="pdf-frame" src={pdfUrl} title={detail.sourceDocument.filename} /> : pdfUrl === false ? <Notice tone="warning">{t.pdfUnavailable}</Notice> : <div className="skeleton pdf-frame" aria-label={t.loadingPdf} />}
   </>;
 }
 
@@ -102,8 +103,8 @@ export function CoverageTab({ detail, locale, busy, onCheck }: { detail: Workspa
     </div> : <Notice tone="info">{t.notChecked}</Notice>}
     {rows.some(([, value]) => value) && <dl className="facts">{rows.filter(([, value]) => value).map(([label, value]) => <div key={label}><dt>{label}</dt><dd><bdi>{value}</bdi></dd></div>)}</dl>}
     {!locked && <form className="inline-form" onSubmit={(event) => { event.preventDefault(); setTouched(true); if (valid) onCheck(memberId); }}>
-      <Field label={t.memberId} error={touched && !valid ? t.memberInvalid : null}>{({ id, describedBy, invalid }) => <input id={id} className="input mono" dir="ltr" value={memberId} aria-describedby={describedBy} aria-invalid={invalid} onBlur={() => setTouched(true)} onChange={(event) => setMemberId(event.target.value.trim().toUpperCase())} placeholder="SYN-4471203" />}</Field>
-      <button className={`button ${insurance?.status === "eligible" ? "" : "button--primary"}`} disabled={busy || !memberId}>{busy ? t.checking : insurance ? t.recheck : t.check}</button>
+      <Field label={t.memberId} error={touched && !valid ? t.memberInvalid : null}>{({ id, describedBy, invalid }) => <input id={id} className="input mono" dir="ltr" value={memberId} aria-describedby={describedBy} aria-invalid={invalid} onBlur={() => setTouched(true)} onChange={(event) => setMemberId(event.target.value.trim().toUpperCase())} placeholder="SYN-…" />}</Field>
+      <button className={`button ${insurance?.status === "eligible" ? "" : "button--primary"}`} disabled={busy}>{busy ? t.checking : insurance ? t.recheck : t.check}</button>
     </form>}
     <p className="muted" style={{ fontSize: 12 }}>{t.coverageSource}</p>
   </>;
@@ -170,7 +171,7 @@ export function ContentTab({ detail, locale, onChange, busy, onRegenerate }: { d
           </div>
         </div>
         <Field full label={t.transfer}>{({ id }) => <textarea id={id} className="textarea" dir="auto" value={plan.transferScript} onChange={(event) => updateCall({ transferScript: event.target.value })} />}</Field>
-        <Field label={t.team}>{({ id }) => <input id={id} className="input" value={plan.transferTarget} onChange={(event) => updateCall({ transferTarget: event.target.value })} />}</Field>
+        <Field label={t.team}>{({ id }) => <input id={id} className="input" dir="auto" value={plan.transferTarget} onChange={(event) => updateCall({ transferTarget: event.target.value })} />}</Field>
         <Field label={t.responder}>{({ id }) => <input id={id} className="input mono" dir="ltr" inputMode="tel" value={plan.responderPhoneE164} onChange={(event) => updateCall({ responderPhoneE164: event.target.value.replace(/\s/g, "") })} placeholder="+9665XXXXXXXX" />}</Field>
       </fieldset>}
     </section>
@@ -187,8 +188,8 @@ function CallSchedule({ plan, locale, onChange }: { plan: CallPlan; locale: Loca
   return <div className="schedule">
     <span className="field__label">{t.schedule}</span>
     <Segmented label={t.schedule} value={preset} onChange={(value) => value === "exact" ? onChange({ firstCallAt: plan.firstCallAt ?? tomorrowAtTen() }) : value !== "custom" && onChange({ firstCallAt: null, scheduledAfterHours: Number(value) })} options={[
-      ...[24, 48, 72].map((hours) => ({ value: String(hours), label: t.inHours.replace("{n}", String(hours)) })),
-      ...(preset === "custom" ? [{ value: "custom", label: t.inHours.replace("{n}", String(plan.scheduledAfterHours)) }] : []),
+      ...[24, 48, 72].map((hours) => ({ value: String(hours), label: plural(hours, locale, t.inHours) })),
+      ...(preset === "custom" ? [{ value: "custom", label: plural(plan.scheduledAfterHours, locale, t.inHours) }] : []),
       { value: "exact", label: t.pickDate },
     ]} />
     <div className="schedule__fields">
@@ -256,8 +257,8 @@ export function MedicationsTab({ api, detail, locale, onChange }: { api: HawlakA
           {item.dispensed && <Badge tone={photo ? "info" : "neutral"} plain>{photo ? t.patientPhoto : t.photoAfterApproval}</Badge>}
         </div>
         <div className="med__fields">
-          <Field label={t.medicationName}>{({ id }) => <input id={id} className="input" disabled={locked} value={item.displayName} onChange={(event) => update(item.medicationId, { displayName: event.target.value })} />}</Field>
-          <Field label={t.dose}>{({ id }) => <input id={id} className="input" disabled={locked} value={item.doseInstruction} onChange={(event) => update(item.medicationId, { doseInstruction: event.target.value })} />}</Field>
+          <Field label={t.medicationName}>{({ id }) => <input id={id} className="input" dir="auto" disabled={locked} value={item.displayName} onChange={(event) => update(item.medicationId, { displayName: event.target.value })} />}</Field>
+          <Field label={t.dose}>{({ id }) => <input id={id} className="input" dir="auto" disabled={locked} value={item.doseInstruction} onChange={(event) => update(item.medicationId, { doseInstruction: event.target.value })} />}</Field>
           <div className="med__toggles">
             <label className="switch"><input type="checkbox" role="switch" disabled={locked} checked={item.dispensed} onChange={(event) => update(item.medicationId, { dispensed: event.target.checked, reminderEnabled: event.target.checked ? item.reminderEnabled : false })} />{t.dispensed}</label>
             <label className="switch"><input type="checkbox" role="switch" disabled={locked || !item.dispensed} checked={item.reminderEnabled} onChange={(event) => update(item.medicationId, { reminderEnabled: event.target.checked })} />{t.enableReminder}</label>

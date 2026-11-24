@@ -35,8 +35,29 @@ WhatsApp only delivers free-form voice notes inside the 24-hour window after the
 patient last messaged the business number. For a demo, send any message from the test
 phone to the business number first; production needs an approved message template.
 
+## Monitoring
+
+```bash
+ALERT_EMAIL=you@example.com deploy/aws/monitoring.sh   # once; safe to re-run
+deploy/aws/deploy.sh                                   # switches containers to the CloudWatch log driver
+```
+
+| Piece | What it watches |
+|---|---|
+| Log group `/hawlak/demo` (14 days) | One stream per container. Postgres logs stay on the instance |
+| Alarm `hawlak-demo-errors` | 5+ ERROR, CRITICAL or Traceback lines in 5 minutes |
+| Alarm `hawlak-demo-delivery-failed` | Any failed WhatsApp send or call dispatch (`Delivery run failed` log line) |
+| Alarm `hawlak-demo-instance-status` | EC2 status check failing for 2 minutes |
+| Alarm `hawlak-demo-cpu-high` | CPU at 85%+ for 15 minutes |
+| Dashboard `hawlak-demo` | Alarm states, error and failure counts, CPU, and the latest 50 error lines |
+
+Alarms email the SNS topic `hawlak-demo-alerts`; confirm the subscription email first.
+Disk space is not watched (that needs the CloudWatch agent). An outside uptime check on
+`https://<domain>/api/health` catches a stopped instance or a CloudFront problem.
+
 ## Operating
 
 - Shell: `aws ssm start-session --target <instance-id> --profile hawlak`
-- Logs: `cd /opt/hawlak/current && docker compose -f docker-compose.aws.yml logs -f api`
+- Logs: CloudWatch Logs `/hawlak/demo`, or on the instance
+  `cd /opt/hawlak/current && docker compose -f docker-compose.aws.yml logs -f api`
 - Stop the instance when not demoing to save credits; the Elastic IP keeps the origin stable.

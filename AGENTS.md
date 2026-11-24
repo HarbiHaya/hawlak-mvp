@@ -113,6 +113,7 @@ From the repo root:
 | Delivery worker | `npm run dev:worker` |
 | DB migrations | `uv run --directory apps/api alembic upgrade head` (needs `DATABASE_URL` from `.env`) |
 | AWS release | `deploy/aws/deploy.sh` |
+| AWS logs, alarms and dashboard | `ALERT_EMAIL=… deploy/aws/monitoring.sh` (see `deploy/aws/README.md`) |
 | Provider keys to AWS | `deploy/aws/sync_keys.sh --check`, then `deploy/aws/sync_keys.sh` |
 
 Tests use mocks; no provider keys are needed. Keep `DEMO_PROVIDER_MODE=mock`

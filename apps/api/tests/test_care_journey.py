@@ -1,7 +1,9 @@
+import asyncio
 from types import SimpleNamespace
 
 from app.main import app
 from app.models import Alert, CareJourney, DeliveryRun
+from app.services.journey_delivery import JourneyDeliveryOrchestrator
 from app.services.object_storage import get_object_storage
 
 
@@ -326,6 +328,30 @@ def test_operator_dispatches_due_whatsapp_runs_without_duplicate_provider_calls(
     assert all(item["providerRef"].startswith("mock:") for item in first.json()["data"])
     call_run = db_session.query(DeliveryRun).filter_by(kind="follow_up_call").one()
     assert call_run.status == "pending"
+
+
+def test_failed_delivery_is_logged_without_patient_details(
+    client, internal_auth_headers, db_session, caplog
+):
+    client.post("/internal/workspace/cases", json=intake_body(), headers=internal_auth_headers)
+    client.post(
+        "/internal/workspace/cases/case_poc_01/approve",
+        json={"approvedBy": "SYN-INTEGRATED-CARE-01"},
+        headers={**internal_auth_headers, "Idempotency-Key": "approve-for-failure"},
+    )
+
+    class DownProvider:
+        async def deliver(self, payload):
+            raise RuntimeError("provider down")
+
+    asyncio.run(JourneyDeliveryOrchestrator(db_session, DownProvider()).dispatch_due("case_poc_01"))
+
+    logged = " ".join(
+        r.getMessage() for r in caplog.records if r.name == "app.services.journey_delivery"
+    )
+    assert "Delivery run failed kind=discharge_voice_note error_type=RuntimeError" in logged
+    assert "+966" not in logged
+    assert "case_poc_01" not in logged
 
 
 def test_insurer_can_save_an_incomplete_draft_but_not_approve_it(client, internal_auth_headers):

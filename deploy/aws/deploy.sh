@@ -20,7 +20,7 @@ COPYFILE_DISABLE=1 tar --no-mac-metadata --no-xattrs -czf "$ARCHIVE" \
   package.json package-lock.json tsconfig.base.json docker-compose.aws.yml \
   apps packages deploy fixtures
 aws s3 cp "$ARCHIVE" "s3://$BUCKET/deployments/$RELEASE/source.tgz" --only-show-errors
-echo "Uploaded release $RELEASE ($(du -h "$ARCHIVE" | cut -f1)); building on $INSTANCE…"
+echo "Uploaded release $RELEASE ($(du -h "$ARCHIVE" | cut -f1)); building on ${INSTANCE}..."
 
 deploy/aws/ssm_run.sh "$INSTANCE" "hawlak: deploy $RELEASE" <<SCRIPT
 set -euo pipefail

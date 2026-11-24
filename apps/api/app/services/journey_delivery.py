@@ -1,3 +1,4 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import PurePosixPath
@@ -16,6 +17,8 @@ from app.services.object_storage import ObjectStorage
 from app.services.voice_renderer import build_voice_renderer, checksum_script
 from app.services.whatsapp_client import WhatsAppClient
 from app.services.whatsapp_factory import build_whatsapp_client
+
+logger = logging.getLogger(__name__)
 
 
 class JourneyDeliveryError(RuntimeError):
@@ -181,6 +184,10 @@ class JourneyDeliveryOrchestrator:
             except Exception as exc:
                 run.status = "failed"
                 run.provider_ref = type(exc).__name__
+                # Picked up by the CloudWatch metric filter in deploy/aws/monitoring.sh.
+                logger.warning(
+                    "Delivery run failed kind=%s error_type=%s", run.kind, type(exc).__name__
+                )
             self._session.commit()
         return runs
 

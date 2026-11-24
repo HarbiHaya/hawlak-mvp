@@ -255,6 +255,7 @@ residency design.
 | Insurer review, editing, approval, and scheduling | **Implemented** | Approval creates immutable content and delivery runs |
 | Production clinical-role separation | **Planned** | ADRs define it; demo auth has one broad insurer role |
 | AWS-hosted demo | **Implemented** | Repository documents CloudFront, EC2, S3, SSM, and mock mode; this review did not independently inspect the account |
+| Operational logs and alarms | **Implemented** | Container logs for the API, webhook, workers, call agent, dashboard and proxy go to CloudWatch Logs `/hawlak/demo` in `eu-north-1`, inside the same AWS project, kept 14 days. They follow the logging boundary above (opaque IDs, phone suffix only). Postgres logs stay on the instance because its error lines can quote row values. Alarms email the alert topic; set up by `deploy/aws/monitoring.sh` |
 | Delivery queue and worker | **Implemented** | Runs operate in mock mode and clearly show simulated delivery |
 | Meta WhatsApp adapter and signed webhook | **Implemented** | Code and tests exist |
 | Meta production sender, templates, and real delivery | **In progress** | Account, payment, templates, credentials, and rehearsal are incomplete |

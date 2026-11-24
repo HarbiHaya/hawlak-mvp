@@ -67,6 +67,14 @@ export function formatNumber(value: number, locale: Locale): string {
   return value.toLocaleString(locale === "ar" ? "ar-SA" : "en-GB");
 }
 
+/** Wording per CLDR plural category; "{n}" becomes the localised number. Arabic needs zero/one/two/few/many/other. */
+export type PluralForms = Partial<Record<Intl.LDMLPluralRule, string>> & { other: string };
+const pluralRules = { ar: new Intl.PluralRules("ar"), en: new Intl.PluralRules("en") };
+
+export function plural(n: number, locale: Locale, forms: PluralForms): string {
+  return (forms[pluralRules[locale].select(n)] ?? forms.other).replace("{n}", formatNumber(n, locale));
+}
+
 /** Relative wording for recent timestamps; falls back to a date. */
 export function formatRelative(value: string | Date, locale: Locale): string {
   const diff = (new Date(value).getTime() - Date.now()) / 1000;

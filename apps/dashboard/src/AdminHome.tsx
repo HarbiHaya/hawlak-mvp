@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type MouseEvent } from "react";
 
 import type { HawlakApi, WorkspaceAlert, WorkspaceCaseSummary } from "./api";
 import { Icon } from "./Icon";
-import { displayError, formatNumber, formatRelative, pick, type Locale } from "./i18n";
+import { displayError, formatNumber, formatRelative, pick, plural, type Locale } from "./i18n";
 import { alertTypeLabel } from "./insurer/text";
 import { viewPath, type UserRole } from "./routing";
 import { Badge, EmptyState, Notice, PageHeader } from "./ui";
@@ -11,13 +11,13 @@ const copy = {
   ar: {
     title: "نظرة عامة", awaiting: "بانتظار المراجعة", approved: "خطط معتمدة", alerts: "تنبيهات مفتوحة",
     queue: "بانتظار المراجعة", alertsTitle: "تنبيهات مفتوحة", viewAll: "عرض الكل", registerCase: "تسجيل حالة", reviewCases: "مراجعة الحالات",
-    noDrafts: "لا توجد حالات بانتظار المراجعة.", noAlerts: "لا توجد تنبيهات مفتوحة.", openCase: "فتح", draft: "بانتظار المراجعة", alertsCount: "{n} تنبيه",
+    noDrafts: "لا توجد حالات بانتظار المراجعة.", noAlerts: "لا توجد تنبيهات مفتوحة.", openCase: "فتح", draft: "بانتظار المراجعة", alertsCount: { one: "تنبيه واحد", two: "تنبيهان", few: "{n} تنبيهات", many: "{n} تنبيهًا", other: "{n} تنبيه" },
     caregiverView: "عرض مرافق المريض",
   },
   en: {
     title: "Overview", awaiting: "Awaiting review", approved: "Approved plans", alerts: "Open alerts",
     queue: "Awaiting review", alertsTitle: "Open alerts", viewAll: "View all", registerCase: "Register case", reviewCases: "Review cases",
-    noDrafts: "No cases are awaiting review.", noAlerts: "No open alerts.", openCase: "Open", draft: "Awaiting review", alertsCount: "{n} alerts",
+    noDrafts: "No cases are awaiting review.", noAlerts: "No open alerts.", openCase: "Open", draft: "Awaiting review", alertsCount: { one: "{n} alert", other: "{n} alerts" },
     caregiverView: "Caregiver view",
   },
 } as const;
@@ -69,7 +69,7 @@ export function AdminHome({ api, locale, role, navigate }: { api: HawlakApi; loc
             const path = `${casesPath}?case=${encodeURIComponent(item.caseId)}`;
             return <li key={item.caseId}><a className="row" href={path} onClick={go(path)}>
               <div className="row__main"><b>{item.patientName}</b><small className="mono" dir="ltr" style={{ justifySelf: "start" }}>{item.caseId}</small></div>
-              {item.alertCount > 0 && <Badge tone="danger">{t.alertsCount.replace("{n}", formatNumber(item.alertCount, locale))}</Badge>}
+              {item.alertCount > 0 && <Badge tone="danger">{plural(item.alertCount, locale, t.alertsCount)}</Badge>}
               <Badge tone="warning">{t.draft}</Badge>
               <Icon name="arrow" size={16} />
             </a></li>;

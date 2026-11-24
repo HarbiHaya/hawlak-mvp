@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState, type MouseEvent, type ReactNode } fro
 
 import type { HawlakApi, ProgrammeAnalytics } from "../api";
 import { Icon } from "../Icon";
-import { displayError, formatDate, formatNumber, formatTime, pick, type Bilingual, type Locale } from "../i18n";
+import { displayError, formatDate, formatNumber, formatTime, pick, type Bilingual, plural, type Locale } from "../i18n";
 import { Badge, EmptyState, Notice, PageHeader, Segmented } from "../ui";
 import { alertTypeLabel, dialectLabel, languageLabel, photoCheckLabel, runKindLabel } from "./text";
 
@@ -10,16 +10,16 @@ type Period = "7" | "30" | "90";
 
 const copy = {
   ar: {
-    title: "تحليلات البرنامج", subtitle: "الحالات المسجّلة خلال آخر {n} يوماً. أعداد ومدد فقط، بلا بيانات مرضى.", period: "الفترة", days: "{n} يوماً", refresh: "تحديث", updated: "آخر تحديث {time}",
+    title: "تحليلات البرنامج", subtitle: "الحالات المسجّلة خلال آخر {days}. أعداد ومدد فقط، بلا بيانات مرضى.", period: "الفترة", days: { one: "يوم", two: "يومين", few: "{n} أيام", many: "{n} يومًا", other: "{n} يوم" }, refresh: "تحديث", updated: "آخر تحديث {time}",
     demo: "وضع العرض مفعّل: خطوات الإرسال تُحاكى ولا تصل فعلياً، فأرقام الإرسال هنا ليست وصولاً حقيقياً.",
     nowTitle: "الوضع الآن", awaiting: "بانتظار المراجعة", longestWait: "أطول انتظار {t}", nothingWaiting: "لا شيء ينتظر",
-    attention: "تتطلب إجراءً", highAlerts: "{n} تنبيه عالي الأولوية · أقدمها منذ {t}", noHighAlerts: "لا تنبيهات عالية الأولوية",
-    active: "خطط متابعة نشطة", completed: "{n} خطة اكتملت", photosWaiting: "صور بانتظار المراجعة", lowAlerts: "{n} تنبيه للمراجعة",
+    attention: "تتطلب إجراءً", highAlerts: { one: "تنبيه عالي الأولوية · منذ {t}", two: "تنبيهان عاليا الأولوية · أقدمهما منذ {t}", few: "{n} تنبيهات عالية الأولوية · أقدمها منذ {t}", many: "{n} تنبيهًا عالي الأولوية · أقدمها منذ {t}", other: "{n} تنبيه عالي الأولوية · أقدمها منذ {t}" }, noHighAlerts: "لا تنبيهات عالية الأولوية",
+    active: "خطط متابعة نشطة", completed: { zero: "لم تكتمل أي خطة بعد", one: "اكتملت خطة واحدة", two: "اكتملت خطتان", few: "اكتملت {n} خطط", other: "اكتملت {n} خطة" }, photosWaiting: "صور بانتظار المراجعة", lowAlerts: { zero: "لا تنبيهات للمراجعة", one: "تنبيه واحد للمراجعة", two: "تنبيهان للمراجعة", few: "{n} تنبيهات للمراجعة", many: "{n} تنبيهًا للمراجعة", other: "{n} تنبيه للمراجعة" },
     funnelTitle: "مسار الحالة", funnelNote: "النسبة من الحالات المسجّلة في الفترة.",
     reviewTitle: "المراجعة والاعتماد", medianApproval: "وسيط المدة من التسجيل إلى الاعتماد", within24: "اعتُمدت خلال ٢٤ ساعة", edited: "مسودات عدّلها المراجع قبل الاعتماد",
     aiDrafted: "مسودات صاغها نموذج الذكاء الاصطناعي", aiRejected: "مسودات رفضها فحص الحقائق فاستُخدمت القوالب",
     trendTitle: "الحالات يومياً", registeredPerDay: "سُجّلت", approvedPerDay: "اعتُمدت", peak: "الأعلى في يوم: {n}", table: "عرض الأرقام في جدول", date: "التاريخ",
-    deliveryTitle: "الإرسال حسب القناة", step: "الخطوة", scheduled: "مجدولة", delivered: "أُرسلت", failed: "تعذّرت", rate: "نسبة الإرسال", simulated: "{n} خطوة تمت محاكاتها ولم تُرسل فعلياً.",
+    deliveryTitle: "الإرسال حسب القناة", step: "الخطوة", scheduled: "مجدولة", delivered: "أُرسلت", failed: "تعذّرت", rate: "نسبة الإرسال", simulated: { one: "خطوة واحدة تمت محاكاتها ولم تُرسل فعلياً.", two: "خطوتان تمت محاكاتهما ولم تُرسلا فعلياً.", few: "{n} خطوات تمت محاكاتها ولم تُرسل فعلياً.", other: "{n} خطوة تمت محاكاتها ولم تُرسل فعلياً." },
     callsTitle: "مكالمات المتابعة", callsDone: "اكتملت مع المريض", callsTransferred: "حُوّلت إلى فريق الرعاية", callsFailed: "لم تكتمل", callsPlaced: "أُجريت ولم تصل نتيجتها بعد", callsScheduled: "ما زالت مجدولة", escalation: "نسبة التحويل من المكالمات المُجابة",
     photosTitle: "صور علب الأدوية", boxes: "علب وصلت صورتها", firstMatch: "طابقت الخطة من أول قراءة", photosReview: "بانتظار مراجعة الصيدلي", reviewTime: "وسيط المدة حتى المراجعة",
     fromPatient: "من المريض", fromCaregiver: "من المرافق", byResult: "نتيجة الفحص الآلي", noPhotos: "لم تصل صور في هذه الفترة.",
@@ -29,16 +29,16 @@ const copy = {
     empty: "لا حالات مسجّلة في هذه الفترة", emptyHint: "اختر فترة أطول، أو سجّل حالة من مساحة المستشفى.", none: "—",
   },
   en: {
-    title: "Programme analytics", subtitle: "Cases registered in the last {n} days. Counts and times only, no patient details.", period: "Period", days: "{n} days", refresh: "Refresh", updated: "Updated {time}",
+    title: "Programme analytics", subtitle: "Cases registered in the last {days}. Counts and times only, no patient details.", period: "Period", days: { one: "{n} day", other: "{n} days" }, refresh: "Refresh", updated: "Updated {time}",
     demo: "Demo mode is on: delivery steps are simulated and reach no one, so the delivery figures here are not real deliveries.",
     nowTitle: "Right now", awaiting: "Awaiting review", longestWait: "Longest wait {t}", nothingWaiting: "Nothing waiting",
-    attention: "Needs action", highAlerts: "{n} high-priority alerts · oldest {t}", noHighAlerts: "No high-priority alerts",
-    active: "Active follow-up plans", completed: "{n} plans completed", photosWaiting: "Photos awaiting review", lowAlerts: "{n} alerts for review",
+    attention: "Needs action", highAlerts: { one: "{n} high-priority alert · open {t}", other: "{n} high-priority alerts · oldest {t}" }, noHighAlerts: "No high-priority alerts",
+    active: "Active follow-up plans", completed: { one: "{n} plan completed", other: "{n} plans completed" }, photosWaiting: "Photos awaiting review", lowAlerts: { one: "{n} alert for review", other: "{n} alerts for review" },
     funnelTitle: "Case funnel", funnelNote: "Share of the cases registered in the period.",
     reviewTitle: "Review and approval", medianApproval: "Median time from registration to approval", within24: "Approved within 24 hours", edited: "Drafts the reviewer edited before approval",
     aiDrafted: "Drafts written by the AI model", aiRejected: "AI drafts rejected by the fact check (templates used)",
     trendTitle: "Cases per day", registeredPerDay: "Registered", approvedPerDay: "Approved", peak: "Busiest day: {n}", table: "Show the numbers as a table", date: "Date",
-    deliveryTitle: "Delivery by channel", step: "Step", scheduled: "Scheduled", delivered: "Delivered", failed: "Failed", rate: "Delivery rate", simulated: "{n} steps were simulated and not actually sent.",
+    deliveryTitle: "Delivery by channel", step: "Step", scheduled: "Scheduled", delivered: "Delivered", failed: "Failed", rate: "Delivery rate", simulated: { one: "{n} step was simulated and not actually sent.", other: "{n} steps were simulated and not actually sent." },
     callsTitle: "Follow-up calls", callsDone: "Completed with the patient", callsTransferred: "Transferred to the care team", callsFailed: "Not completed", callsPlaced: "Placed, outcome not reported yet", callsScheduled: "Still scheduled", escalation: "Share of answered calls transferred",
     photosTitle: "Medicine-box photos", boxes: "Boxes with a photo", firstMatch: "Matched the plan on first read", photosReview: "Awaiting pharmacist review", reviewTime: "Median time to review",
     fromPatient: "From the patient", fromCaregiver: "From the caregiver", byResult: "Automatic check result", noPhotos: "No photos arrived in this period.",
@@ -116,8 +116,8 @@ export function AnalyticsView({ api, locale, casesPath, alertsPath, navigate }: 
     event.preventDefault(); navigate(path);
   };
   const n = (value: number) => formatNumber(value, locale);
-  const header = <PageHeader title={t.title} description={t.subtitle.replace("{n}", n(Number(period)))} actions={<>
-    <Segmented label={t.period} value={period} onChange={setPeriod} options={(["7", "30", "90"] as const).map((value) => ({ value, label: t.days.replace("{n}", n(Number(value))) }))} />
+  const header = <PageHeader title={t.title} description={t.subtitle.replace("{days}", plural(Number(period), locale, t.days))} actions={<>
+    <Segmented label={t.period} value={period} onChange={setPeriod} options={(["7", "30", "90"] as const).map((value) => ({ value, label: plural(Number(value), locale, t.days) }))} />
     <button type="button" className="button" disabled={busy} onClick={() => void load()}><Icon name="refresh" size={15} />{t.refresh}</button>
   </>} />;
 
@@ -140,9 +140,9 @@ export function AnalyticsView({ api, locale, casesPath, alertsPath, navigate }: 
 
     <section className="panel metrics metrics--4" aria-label={t.nowTitle}>
       <a className="metric" href={casesPath} onClick={go(casesPath)}><span>{t.awaiting}</span><b>{n(now.awaitingReview)}</b><small>{now.oldestWaitingHours === null ? t.nothingWaiting : t.longestWait.replace("{t}", duration(now.oldestWaitingHours, locale))}</small></a>
-      <a className="metric" href={alertsPath} onClick={go(alertsPath)}><span>{t.attention}</span><b className={now.needsAttention ? "is-danger" : undefined}>{n(now.needsAttention)}</b><small>{now.openAlerts.high ? t.highAlerts.replace("{n}", n(now.openAlerts.high)).replace("{t}", duration(now.oldestOpenAlertHours, locale)) : t.noHighAlerts}</small></a>
-      <a className="metric" href={casesPath} onClick={go(casesPath)}><span>{t.active}</span><b>{n(now.activeJourneys)}</b><small>{t.completed.replace("{n}", n(now.completedJourneys))}</small></a>
-      <a className="metric" href={casesPath} onClick={go(casesPath)}><span>{t.photosWaiting}</span><b>{n(now.photosAwaitingReview)}</b><small>{t.lowAlerts.replace("{n}", n(now.openAlerts.low))}</small></a>
+      <a className="metric" href={alertsPath} onClick={go(alertsPath)}><span>{t.attention}</span><b className={now.needsAttention ? "is-danger" : undefined}>{n(now.needsAttention)}</b><small>{now.openAlerts.high ? plural(now.openAlerts.high, locale, t.highAlerts).replace("{t}", duration(now.oldestOpenAlertHours, locale)) : t.noHighAlerts}</small></a>
+      <a className="metric" href={casesPath} onClick={go(casesPath)}><span>{t.active}</span><b>{n(now.activeJourneys)}</b><small>{plural(now.completedJourneys, locale, t.completed)}</small></a>
+      <a className="metric" href={casesPath} onClick={go(casesPath)}><span>{t.photosWaiting}</span><b>{n(now.photosAwaitingReview)}</b><small>{plural(now.openAlerts.low, locale, t.lowAlerts)}</small></a>
     </section>
 
     {registered === 0 ? <section className="panel"><EmptyState icon="chart" title={t.empty}><p>{t.emptyHint}</p></EmptyState></section> : <div className="analytics-grid">
@@ -181,7 +181,7 @@ export function AnalyticsView({ api, locale, casesPath, alertsPath, navigate }: 
           <thead><tr><th scope="col">{t.step}</th><th scope="col">{t.scheduled}</th><th scope="col">{t.delivered}</th><th scope="col">{t.failed}</th><th scope="col">{t.rate}</th></tr></thead>
           <tbody>{data.delivery.map((row) => <tr key={row.kind}><th scope="row">{pick(runKindLabel, row.kind, locale)}</th><td>{n(row.scheduled)}</td><td>{n(row.delivered)}</td><td className={row.failed ? "is-danger" : undefined}>{n(row.failed)}</td><td>{percent(row.successPct, locale)}</td></tr>)}</tbody>
         </table></div>
-        {simulated > 0 && <p className="panel__note">{t.simulated.replace("{n}", n(simulated))}</p>}
+        {simulated > 0 && <p className="panel__note">{plural(simulated, locale, t.simulated)}</p>}
       </section>
 
       <section className="panel">

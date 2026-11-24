@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 
 import type { WorkspaceCaseSummary } from "../api";
 import { Icon } from "../Icon";
-import { formatNumber, formatRelative, formatShort, type Locale } from "../i18n";
+import { formatNumber, formatRelative, formatShort, plural, type Locale } from "../i18n";
 import { Badge, Segmented } from "../ui";
 import { t as texts } from "./text";
 
@@ -39,9 +39,9 @@ export function CaseQueue({ cases, locale, filter, onFilter, query, onQuery, sel
         <button type="button" className="queue-item" aria-current={selectedId === item.caseId ? "true" : undefined} onClick={() => onSelect(item.caseId)}>
           <b>{item.patientName}</b>
           <span className="queue-item__meta">
-            {item.alertCount > 0 && <span className="count count--danger" title={t.openAlerts.replace("{n}", String(item.alertCount))} aria-label={t.openAlerts.replace("{n}", String(item.alertCount))}>{formatNumber(item.alertCount, locale)}</span>}
+            {item.alertCount > 0 && <span className="count count--danger" title={plural(item.alertCount, locale, t.openAlerts)} aria-label={plural(item.alertCount, locale, t.openAlerts)}>{formatNumber(item.alertCount, locale)}</span>}
             {item.stage === "needs_attention" && <Badge tone="danger" plain>{t.needsAttention}</Badge>}
-            {!!item.failedRunCount && <Badge tone="warning" plain>{t.failedSteps.replace("{n}", formatNumber(item.failedRunCount, locale))}</Badge>}
+            {!!item.failedRunCount && <Badge tone="warning" plain>{plural(item.failedRunCount, locale, t.failedSteps)}</Badge>}
             {filter === "all" && <Badge tone={item.reviewStatus === "approved" ? "success" : "warning"} plain>{item.reviewStatus === "approved" ? t.statusApproved : t.statusDraft}</Badge>}
           </span>
           <small className="mono" dir="ltr" style={{ justifySelf: "start" }}>{item.caseId}</small>
